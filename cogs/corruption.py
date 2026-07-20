@@ -10,7 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timedelta, timezone
 
-from .config import EMBED_COLOR, OWNER_ID
+from .config import EMBED_COLOR
 
 DATA_FILE = "corruption_data.json"
 
@@ -98,6 +98,31 @@ class Corruption(commands.Cog):
 
     def save(self):
         save_data(self.data)
+
+    # ---------- /help ----------
+
+    @app_commands.command(name="help", description="Show all corruption game commands and how they work.")
+    async def help_command(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="📖 Corruption Game — Command Guide",
+            description="Build your empire, dodge the law, and climb to the top.",
+            color=EMBED_COLOR,
+        )
+
+        embed.add_field(name="📣 /campaign", value="Gain supporters and reputation.", inline=False)
+        embed.add_field(name="🤫 /bribe `amount`", value="Spend money to increase your influence, but risk getting caught.", inline=False)
+        embed.add_field(name="🤝 /connections `[member]`", value="View your network, or recruit a new ally for bonuses.", inline=False)
+        embed.add_field(name="📄 /contracts", value="Complete shady deals for dirty money rewards.", inline=False)
+        embed.add_field(name="🧺 /launder `[amount]`", value='Convert "dirty money" into usable currency (a fee applies).', inline=False)
+        embed.add_field(name="🔍 /investigate `member`", value="Try to uncover another player's secrets.", inline=False)
+        embed.add_field(name="💥 /raid `member`", value="Steal part of another player's resources — risky if it fails.", inline=False)
+        embed.add_field(name="⚖️ /court", value="Defend yourself if you've been caught bribing or raiding.", inline=False)
+        embed.add_field(name="🗳️ /election", value="See who currently holds the most influence and wins the title.", inline=False)
+        embed.add_field(name="🏆 /leaderboard `[category]`", value="Rank players by money, influence, or reputation.", inline=False)
+        embed.add_field(name="🎁 /donate `member` `amount`", value="Give another player some of your money.", inline=False)
+
+        embed.set_footer(text="Tip: most actions have cooldowns, so plan your moves wisely.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ---------- /campaign ----------
 
@@ -516,26 +541,6 @@ class Corruption(commands.Cog):
             color=EMBED_COLOR,
         )
         await interaction.response.send_message(embed=embed)
-
-    # ---------- /give (owner only) ----------
-
-    @app_commands.command(name="give", description="[Owner only] Give any player any amount of money.")
-    @app_commands.describe(member="Who to give money to", amount="How much money to give")
-    async def give(self, interaction: discord.Interaction, member: discord.Member, amount: int):
-        if interaction.user.id != OWNER_ID:
-            await interaction.response.send_message("🚫 Only the bot owner can use this command.", ephemeral=True)
-            return
-
-        target_profile = self.get_profile(member.id)
-        target_profile["money"] += amount
-        self.save()
-
-        embed = discord.Embed(
-            title="👑 Owner Grant",
-            description=f"Gave 💰**{amount}** to {member.mention}.\nNew balance: {target_profile['money']}",
-            color=EMBED_COLOR,
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot):
