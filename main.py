@@ -17,6 +17,7 @@ COGS = [
     "cogs.server",
     "cogs.message",
     "cogs.role",
+    "cogs.corruption",
 ]
 
 
