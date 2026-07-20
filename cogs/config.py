@@ -7,6 +7,7 @@ import discord
 
 # The channel where members type a number to self-assign a role.
 ROLE_CHANNEL_ID = 1522530868768542760  # replace with your channel ID
+OWNER_ID = 843377668488429569  # replace with your actual Discord user ID
 
 ROLE_MAP = {
     "abracadabra": 1523925145482297415,
