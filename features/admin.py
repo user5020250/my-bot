@@ -1,5 +1,4 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 import db_utils as db
@@ -13,28 +12,25 @@ class Admin(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(
+    @commands.command(
         name="give",
-        description="Owner-only money command.",
-    )
-    @app_commands.describe(
-        amount="How much money to give",
-        user="Leave blank to give yourself money",
     )
     async def give(
         self,
-        interaction: discord.Interaction,
-        amount: app_commands.Range[int, 1],
+        ctx: commands.Context,
+        amount: int,
         user: discord.Member | None = None,
     ):
-        if interaction.user.id != OWNER_ID:
-            await interaction.response.send_message(
-                "You can't use this command.",
-                ephemeral=True,
+        if ctx.author.id != OWNER_ID:
+            return
+
+        if amount <= 0:
+            await ctx.send(
+                "❌ Amount must be greater than 0."
             )
             return
 
-        target = user or interaction.user
+        target = user or ctx.author
 
         new_balance = db.add_balance(
             str(target.id),
@@ -42,7 +38,7 @@ class Admin(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Money Added",
+            title="💸 Money Added",
             description=(
                 f"Gave **{db.format_peso(amount)}** "
                 f"to {target.mention}."
@@ -51,15 +47,20 @@ class Admin(commands.Cog):
         )
 
         embed.set_footer(
-            text=f"New balance: {db.format_peso(new_balance)}"
+            text=(
+                f"New balance: "
+                f"{db.format_peso(new_balance)}"
+            )
         )
 
-        await interaction.response.send_message(
+        await ctx.send(
             embed=embed
         )
 
 
-async def setup(bot: commands.Bot):
+async def setup(
+    bot: commands.Bot,
+):
     await bot.add_cog(
         Admin(bot)
     )
