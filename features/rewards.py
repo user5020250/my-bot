@@ -12,7 +12,7 @@ WHITE = discord.Color(0xFFFFFF)
 
 # ------------------------------------------------------------------
 # These are flat "claim" rewards — separate from business income.
-# Each one is a rolling cooldown (same pattern as /budol, /karaoke):
+# Each one is a rolling cooldown (same pattern as /scam, /karaoke):
 # claiming starts the timer, and you can claim again once that many
 # seconds have passed, regardless of real-world calendar days.
 # ------------------------------------------------------------------
@@ -80,7 +80,7 @@ class Rewards(commands.Cog):
         # respond" instead of a real error message.
         print(f"[rewards] command error: {error!r}")
 
-        message = "May naganap na error. Subukan ulit mamaya."
+        message = "⚠️ Something went wrong. Please try again later."
 
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
@@ -107,7 +107,7 @@ class Rewards(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"Nakuha mo na ang daily mo. "
+                f"⏳ You've already claimed your daily reward. "
                 f"Try again in **{db.format_duration(remaining)}**."
             )
             return
@@ -129,16 +129,16 @@ class Rewards(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Daily reward",
+            title="☀️ Daily Reward",
             description=(
-                f"Nakakuha ka ng **{db.format_peso(amount)}** "
-                f"na baon para ngayong araw."
+                f"You received **{db.format_peso(amount)}** "
+                f"in allowance for today."
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=f"Balance: {db.format_peso(new_balance)}"
+            text=f"💰 Balance: {db.format_peso(new_balance)}"
         )
 
         await interaction.response.send_message(embed=embed)
@@ -163,7 +163,7 @@ class Rewards(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"Nakuha mo na ang weekly mo. "
+                f"⏳ You've already claimed your weekly reward. "
                 f"Try again in **{db.format_duration(remaining)}**."
             )
             return
@@ -185,16 +185,16 @@ class Rewards(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Weekly reward",
+            title="📅 Weekly Reward",
             description=(
-                f"Nakakuha ka ng **{db.format_peso(amount)}** "
-                f"na weekly sahod."
+                f"You received **{db.format_peso(amount)}** "
+                f"as your weekly pay."
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=f"Balance: {db.format_peso(new_balance)}"
+            text=f"💰 Balance: {db.format_peso(new_balance)}"
         )
 
         await interaction.response.send_message(embed=embed)
@@ -219,7 +219,7 @@ class Rewards(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"Nakuha mo na ang monthly mo. "
+                f"⏳ You've already claimed your monthly reward. "
                 f"Try again in **{db.format_duration(remaining)}**."
             )
             return
@@ -241,16 +241,16 @@ class Rewards(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Monthly reward",
+            title="🗓️ Monthly Reward",
             description=(
-                f"Nakakuha ka ng **{db.format_peso(amount)}** "
-                f"na buwanang sweldo."
+                f"You received **{db.format_peso(amount)}** "
+                f"as your monthly salary."
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=f"Balance: {db.format_peso(new_balance)}"
+            text=f"💰 Balance: {db.format_peso(new_balance)}"
         )
 
         await interaction.response.send_message(embed=embed)
@@ -275,7 +275,7 @@ class Rewards(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"Nakuha mo na ang yearly mo. "
+                f"⏳ You've already claimed your yearly reward. "
                 f"Try again in **{db.format_duration(remaining)}**."
             )
             return
@@ -297,16 +297,16 @@ class Rewards(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="🎉 Yearly reward",
+            title="🎉 Yearly Reward",
             description=(
-                f"Nakakuha ka ng **{db.format_peso(amount)}** "
-                f"na taunang bonus (parang 13th month pay)!"
+                f"You received **{db.format_peso(amount)}** "
+                f"as your yearly bonus (like a 13th month pay)!"
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=f"Balance: {db.format_peso(new_balance)}"
+            text=f"💰 Balance: {db.format_peso(new_balance)}"
         )
 
         await interaction.response.send_message(embed=embed)
