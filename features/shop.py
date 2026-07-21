@@ -21,15 +21,17 @@ SHOP_ITEMS = {
         "description": "Protects you from /steal for 24 hours.",
         "min_stock": 1,
         "max_stock": 3,
+        "sellable": False,
     },
 
     "lottery_ticket": {
         "name": "Lottery Ticket",
         "emoji": "🎟️",
         "cost": 10_000,
-        "description": "Might be useful in the future.",
+        "description": "Used automatically when joining lotteries.",
         "min_stock": 0,
         "max_stock": 5,
+        "sellable": False,
     },
 
     "burger": {
@@ -39,6 +41,147 @@ SHOP_ITEMS = {
         "description": "Just a burger.",
         "min_stock": 1,
         "max_stock": 10,
+        "sellable": False,
+    },
+
+    # ---------------- Protection Items ----------------
+
+    "alarm_system": {
+        "name": "Alarm System",
+        "emoji": "🚨",
+        "cost": 15_000,
+        "description": "Gives the thief a longer cooldown if they get caught stealing from you.",
+        "min_stock": 0,
+        "max_stock": 2,
+        "sellable": True,
+    },
+
+    "insurance": {
+        "name": "Insurance",
+        "emoji": "🛡️",
+        "cost": 20_000,
+        "description": "Refunds part of the stolen money if you get robbed.",
+        "min_stock": 0,
+        "max_stock": 2,
+        "sellable": True,
+    },
+
+    # ---------------- Crime Items ----------------
+
+    "gloves": {
+        "name": "Gloves",
+        "emoji": "🧤",
+        "cost": 3000,
+        "description": "Increases your steal success chance for your next attempt.",
+        "min_stock": 1,
+        "max_stock": 5,
+        "sellable": True,
+    },
+
+    "mask": {
+        "name": "Mask",
+        "emoji": "😷",
+        "cost": 3500,
+        "description": "Lowers your chance of getting caught for your next steal.",
+        "min_stock": 1,
+        "max_stock": 5,
+        "sellable": True,
+    },
+
+    "lockpick": {
+        "name": "Lockpick",
+        "emoji": "🔑",
+        "cost": 8000,
+        "description": "70% chance to break a target's padlock.",
+        "min_stock": 0,
+        "max_stock": 3,
+        "sellable": True,
+    },
+
+    # ---------------- Consumable ----------------
+
+    "energy_drink": {
+        "name": "Energy Drink",
+        "emoji": "⚡",
+        "cost": 2000,
+        "description": "Lets you work again instantly.",
+        "min_stock": 1,
+        "max_stock": 5,
+        "sellable": True,
+    },
+
+    # ---------------- Lottery ----------------
+
+    "mystery_cash_box": {
+        "name": "Mystery Cash Box",
+        "emoji": "🎁",
+        "cost": 4000,
+        "description": "Contains a random amount of cash. You could win or lose money.",
+        "min_stock": 0,
+        "max_stock": 5,
+        "sellable": True,
+    },
+
+    # ---------------- Rare Items ----------------
+
+    "diamond": {
+        "name": "Diamond",
+        "emoji": "💎",
+        "cost": 50_000,
+        "description": "An expensive trade item.",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
+    },
+
+    "crown": {
+        "name": "Crown",
+        "emoji": "👑",
+        "cost": 75_000,
+        "description": "A prestige collectible.",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
+    },
+
+    "trophy": {
+        "name": "Trophy",
+        "emoji": "🏆",
+        "cost": 60_000,
+        "description": "An event reward.",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
+    },
+
+    "mystery_crate": {
+        "name": "Mystery Crate",
+        "emoji": "📦",
+        "cost": 12_000,
+        "description": "Contains a random item.",
+        "min_stock": 0,
+        "max_stock": 3,
+        "sellable": True,
+    },
+
+    "ancient_coin": {
+        "name": "Ancient Coin",
+        "emoji": "🪙",
+        "cost": 90_000,
+        "description": "A very rare collectible.",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
+    },
+
+    "trade_permit": {
+        "name": "Trade Permit",
+        "emoji": "📜",
+        "cost": 5000,
+        "description": "Required for trading. Consumed each time you trade.",
+        "min_stock": 0,
+        "max_stock": 3,
+        "sellable": True,
     },
 }
 
@@ -232,7 +375,8 @@ class Shop(commands.Cog):
         embed = discord.Embed(
             title="🛒 Shop",
             description=(
-                "Use `/buy <item> <qty>`."
+                "Use `/buy <item> <qty>`.\n"
+                "Use `/sell <item> <qty>` to sell items back."
             ),
             color=WHITE,
         )
@@ -410,7 +554,116 @@ class Shop(commands.Cog):
         await interaction.response.send_message(
             embed=embed
         )
-    
+
+    # ==========================
+    # /sell
+    # ==========================
+
+    @app_commands.command(
+        name="sell",
+        description="Sell an item back to the shop.",
+    )
+    @app_commands.describe(
+        item="Item to sell",
+        qty="How many to sell",
+    )
+    async def sell(
+        self,
+        interaction: discord.Interaction,
+        item: str,
+        qty: app_commands.Range[int, 1] = 1,
+    ):
+        item = item.lower()
+
+        if item not in SHOP_ITEMS:
+            await interaction.response.send_message(
+                "❌ Item not found.",
+                ephemeral=True,
+            )
+            return
+
+        shop_item = SHOP_ITEMS[item]
+
+        if not shop_item.get("sellable", False):
+            await interaction.response.send_message(
+                "❌ This item can't be sold.",
+                ephemeral=True,
+            )
+            return
+
+        user_id = str(interaction.user.id)
+
+        if not db.has_item(user_id, item, qty):
+            await interaction.response.send_message(
+                f"❌ You don't own `{qty}` of `{shop_item['name']}`.",
+                ephemeral=True,
+            )
+            return
+
+        sell_price = shop_item["cost"] // 2
+
+        total_earned = sell_price * qty
+
+        db.remove_inventory(
+            user_id,
+            item,
+            qty,
+        )
+
+        new_balance = db.add_balance(
+            user_id,
+            total_earned,
+        )
+
+        embed = discord.Embed(
+            title="💵 Sold",
+            color=WHITE,
+        )
+
+        embed.add_field(
+            name="📦 Item",
+            value=(
+                f"{shop_item['emoji']} "
+                f"`{shop_item['name']}` x{qty}"
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💸 Earned",
+            value=f"`{db.format_peso(total_earned)}`",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💰 New Balance",
+            value=f"`{db.format_peso(new_balance)}`",
+            inline=False,
+        )
+
+        await interaction.response.send_message(
+            embed=embed
+        )
+
+    @sell.autocomplete("item")
+    async def sell_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ):
+        current = current.lower()
+
+        return [
+            app_commands.Choice(
+                name=item["name"],
+                value=item_id,
+            )
+            for item_id, item in SHOP_ITEMS.items()
+            if item.get("sellable", False)
+            and current in item_id
+        ][:25]
+
+
 async def setup(bot):
     await bot.add_cog(
         Shop(bot)
