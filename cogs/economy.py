@@ -28,7 +28,7 @@ class Economy(commands.Cog):
     async def jobs(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="Trabaho Menu",
-            description="Choose a job with `/trabaho job:[job]` and start the grind.",
+            description="Choose a job with `/trabaho job: [job]` and start the grind.",
             color=WHITE,
         )
 
@@ -39,6 +39,7 @@ class Economy(commands.Cog):
                     f"{db.format_peso(info['min'])} – "
                     f"{db.format_peso(info['max'])} per shift\n"
                     f"*{info['flavor']}*"
+                    "\u200b"
                 ),
                 inline=False,
             )
