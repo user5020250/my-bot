@@ -216,10 +216,9 @@ class HelpView(discord.ui.View):
         data = PAGES[self.page]
 
         embed = discord.Embed(
-            title=f"📖 {data['category']}",
-            description=INTRO,
-            color=WHITE,
-        )
+    title=f"📖 Commands — {page['category']}",
+    color=WHITE,
+)
 
         for name, desc in data["commands"]:
             embed.add_field(
