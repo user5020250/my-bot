@@ -22,6 +22,7 @@ COGS = [
     "cogs.economy",   # NEW: /jobs /trabaho /tambay /sugal /baon
     "cogs.market",    # NEW: /palengke /load
     "cogs.social",    # NEW: /utang /bayad /budol /karaoke
+    "cogs.admin",     # NEW: /give
     "cogs.help",      # NEW: /help command
 ]
 
