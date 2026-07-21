@@ -28,6 +28,7 @@ COGS = [
     "features.profile", # NEW: /profile
     "features.business",
     "features.rewards",
+    "features.leaderboard",
 ]
 
 
