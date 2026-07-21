@@ -232,7 +232,7 @@ class Shop(commands.Cog):
         embed = discord.Embed(
             title="🛒 Shop",
             description=(
-                "Use `/buy <item>`."
+                "Use `/buy <item> <qty>`."
             ),
             color=WHITE,
         )
@@ -263,118 +263,164 @@ class Shop(commands.Cog):
             embed=embed
         )
 
-    # ==========================
-    # /buy
-    # ==========================
+# ==========================
+# /buy
+# ==========================
 
-    @app_commands.command(
-        name="buy",
-        description="Buy an item.",
-    )
-    async def buy(
-        self,
-        interaction: discord.Interaction,
-        item: str,
-    ):
-        item = item.lower()
+@app_commands.command(
+    name="buy",
+    description="Buy an item.",
+)
+@app_commands.describe(
+    item="Item to buy",
+    qty="How many to buy",
+)
+async def buy(
+    self,
+    interaction: discord.Interaction,
+    item: str,
+    qty: int = 1,
+):
+    item = item.lower()
 
-        refresh_shop()
+    refresh_shop()
 
-        if item not in SHOP_ITEMS:
-
-            await interaction.response.send_message(
-                "❌ Item not found.",
-                ephemeral=True,
-            )
-            return
-
-        shop_item = SHOP_ITEMS[item]
-
-        stock = get_item_stock(item)
-
-        if stock <= 0:
-
-            await interaction.response.send_message(
-                "❌ This item is out of stock.",
-                ephemeral=True,
-            )
-            return
-
-        user_id = str(interaction.user.id)
-
-        user = db.get_user(user_id)
-
-        if user["balance"] < shop_item["cost"]:
-
-            await interaction.response.send_message(
-                (
-                    f"❌ You need "
-                    f"`{db.format_peso(shop_item['cost'])}`.\n"
-                    f"Current balance: "
-                    f"`{db.format_peso(user['balance'])}`"
-                ),
-                ephemeral=True,
-            )
-            return
-
-        new_balance = db.add_balance(
-            user_id,
-            -shop_item["cost"],
-        )
-
-        db.add_inventory(
-            user_id,
-            item,
-            1,
-            buy_price=shop_item["cost"],
-        )
-
-        remove_stock(item)
-
-        embed = discord.Embed(
-            title="🛒 Purchase Complete",
-            color=WHITE,
-        )
-
-        embed.set_thumbnail(
-            url=interaction.user.display_avatar.url
-        )
-
-        embed.add_field(
-            name="📦 Item",
-            value=(
-                f"{shop_item['emoji']} "
-                f"`{shop_item['name']}`"
-            ),
-            inline=True,
-        )
-
-        embed.add_field(
-            name="💸 Cost",
-            value=f"`{db.format_peso(shop_item['cost'])}`",
-            inline=True,
-        )
-
-        embed.add_field(
-            name="📉 Stock Left",
-            value=f"`{stock - 1}`",
-            inline=True,
-        )
-
-        embed.add_field(
-            name="💰 New Balance",
-            value=f"`{db.format_peso(new_balance)}`",
-            inline=False,
-        )
-
-        embed.set_footer(
-            text="Use /inventory to see your items."
-        )
+    if qty <= 0:
 
         await interaction.response.send_message(
-            embed=embed
+            "❌ Quantity must be greater than 0.",
+            ephemeral=True,
         )
+        return
 
+    if item not in SHOP_ITEMS:
+
+        await interaction.response.send_message(
+            "❌ Item not found.",
+            ephemeral=True,
+        )
+        return
+
+    shop_item = SHOP_ITEMS[item]
+
+    stock = get_item_stock(item)
+
+    if stock <= 0:
+
+        await interaction.response.send_message(
+            "❌ This item is out of stock.",
+            ephemeral=True,
+        )
+        return
+
+    if qty > stock:
+
+        await interaction.response.send_message(
+            (
+                f"❌ Only `{stock}` "
+                f"`{shop_item['name']}` left in stock."
+            ),
+            ephemeral=True,
+        )
+        return
+
+    total_cost = shop_item["cost"] * qty
+
+    user_id = str(interaction.user.id)
+
+    user = db.get_user(user_id)
+
+    if user["balance"] < total_cost:
+
+        await interaction.response.send_message(
+            (
+                f"❌ You need "
+                f"`{db.format_peso(total_cost)}`.\n"
+                f"Current balance: "
+                f"`{db.format_peso(user['balance'])}`"
+            ),
+            ephemeral=True,
+        )
+        return
+
+    new_balance = db.add_balance(
+        user_id,
+        -total_cost,
+    )
+
+    db.add_inventory(
+        user_id,
+        item,
+        qty,
+        buy_price=shop_item["cost"],
+    )
+
+    conn = get_conn()
+
+    conn.execute(
+        """
+        UPDATE shop_stock
+        SET stock = stock - ?
+        WHERE item = ?
+        """,
+        (
+            qty,
+            item,
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+    embed = discord.Embed(
+        title="🛒 Purchase Complete",
+        color=WHITE,
+    )
+
+    embed.set_thumbnail(
+        url=interaction.user.display_avatar.url
+    )
+
+    embed.add_field(
+        name="📦 Item",
+        value=(
+            f"{shop_item['emoji']} "
+            f"`{shop_item['name']}`"
+        ),
+        inline=True,
+    )
+
+    embed.add_field(
+        name="🔢 Quantity",
+        value=f"`{qty}`",
+        inline=True,
+    )
+
+    embed.add_field(
+        name="💸 Total Cost",
+        value=f"`{db.format_peso(total_cost)}`",
+        inline=True,
+    )
+
+    embed.add_field(
+        name="📉 Stock Left",
+        value=f"`{stock - qty}`",
+        inline=True,
+    )
+
+    embed.add_field(
+        name="💰 New Balance",
+        value=f"`{db.format_peso(new_balance)}`",
+        inline=False,
+    )
+
+    embed.set_footer(
+        text="Use /inventory to see your items."
+    )
+
+    await interaction.response.send_message(
+        embed=embed
+    )
 
 async def setup(bot):
     await bot.add_cog(
