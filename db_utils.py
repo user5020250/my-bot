@@ -155,7 +155,9 @@ def join_lottery(
         FROM lottery_entries
         WHERE user_id = ?
         """,
-        (user_id,),
+        (
+            user_id,
+        ),
     ).fetchone()
 
     current_tickets = 0
@@ -213,6 +215,81 @@ def get_lottery_entries() -> list[dict]:
         dict(row)
         for row in rows
     ]
+
+
+def set_lottery_channel(
+    guild_id: str,
+    channel_id: str,
+) -> None:
+
+    conn = get_conn()
+
+    conn.execute(
+        """
+        INSERT INTO lottery_channels (
+            guild_id,
+            channel_id
+        )
+        VALUES (?, ?)
+
+        ON CONFLICT(guild_id)
+
+        DO UPDATE SET
+            channel_id = excluded.channel_id
+        """,
+        (
+            guild_id,
+            channel_id,
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_lottery_channel(
+    guild_id: str,
+) -> str | None:
+
+    conn = get_conn()
+
+    row = conn.execute(
+        """
+        SELECT channel_id
+        FROM lottery_channels
+        WHERE guild_id = ?
+        """,
+        (
+            guild_id,
+        ),
+    ).fetchone()
+
+    conn.close()
+
+    if row is None:
+        return None
+
+    return row["channel_id"]
+
+
+def get_all_lottery_channels() -> list[dict]:
+
+    conn = get_conn()
+
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM lottery_channels
+        """
+    ).fetchall()
+
+    conn.close()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+    
 # ==========================================================
 # USERS
 # ==========================================================
