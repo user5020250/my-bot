@@ -28,6 +28,7 @@ _ALLOWED_COOLDOWN_FIELDS = {
 
 def create_lottery(
     prize: int,
+    ends_at: int,
 ) -> None:
 
     conn = get_conn()
@@ -43,16 +44,19 @@ def create_lottery(
         INSERT INTO lottery (
             id,
             prize,
+            ends_at,
             active
         )
         VALUES (
             1,
+            ?,
             ?,
             1
         )
         """,
         (
             prize,
+            ends_at,
         ),
     )
 
@@ -100,6 +104,20 @@ def end_lottery() -> None:
     conn.close()
 
 
+def clear_lottery_entries() -> None:
+
+    conn = get_conn()
+
+    conn.execute(
+        """
+        DELETE FROM lottery_entries
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
 def join_lottery(
     user_id: str,
     tickets: int = 1,
@@ -128,9 +146,7 @@ def join_lottery(
         FROM lottery_entries
         WHERE user_id = ?
         """,
-        (
-            user_id,
-        ),
+        (user_id,),
     ).fetchone()
 
     current_tickets = 0
@@ -138,10 +154,7 @@ def join_lottery(
     if row:
         current_tickets = row["tickets"]
 
-    new_total = (
-        current_tickets
-        + tickets
-    )
+    new_total = current_tickets + tickets
 
     conn.execute(
         """
@@ -191,7 +204,6 @@ def get_lottery_entries() -> list[dict]:
         dict(row)
         for row in rows
     ]
-
 # ==========================================================
 # USERS
 # ==========================================================
