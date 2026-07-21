@@ -404,139 +404,138 @@ class Social(commands.Cog):
         lender: discord.Member,
         amount: str,
     ):
-        
-    borrower = interaction.user
-    borrower_id = str(borrower.id)
-    lender_id = str(lender.id)
+        borrower = interaction.user
+        borrower_id = str(borrower.id)
+        lender_id = str(lender.id)
 
-    if lender_id == borrower_id:
-        await interaction.response.send_message(
-            "🚫 You can't borrow from yourself.",
-            ephemeral=True,
-        )
-        return
-
-    if lender.bot:
-        await interaction.response.send_message(
-            "🤖 Bots don't lend money.",
-            ephemeral=True,
-        )
-        return
-
-    try:
-        principal = db.parse_amount(amount)
-    except ValueError:
-        await interaction.response.send_message(
-            "❌ Invalid amount.\n"
-            "Examples: `1k`, `500k`, `2m`, `1b`, `1t`.",
-            ephemeral=True,
-        )
-        return
-
-    if principal <= 0:
-        await interaction.response.send_message(
-            "❌ Amount must be greater than 0.",
-            ephemeral=True,
-        )
-        return
-
-    conn = get_conn()
-
-    active_loans = conn.execute(
-        """
-        SELECT *
-        FROM loans
-        WHERE borrower = ?
-        AND status = 'active'
-        """,
-        (borrower_id,),
-    ).fetchall()
-
-    overdue_loans = []
-
-    for loan_row in active_loans:
-        loan_row = escalate_if_overdue(conn, loan_row)
-
-        if is_overdue(loan_row):
-            overdue_loans.append(loan_row)
-
-    conn.close()
-
-    if overdue_loans:
-        lines = [
-            (
-                f"`{loan['id']}`: "
-                f"**{db.format_peso(loan['remaining'])}** "
-                f"owed to <@{loan['lender']}> "
-                f"— overdue <t:{loan['due_date']}:R>\n"
-                f"Escalated: {loan['overdue_count']}x "
-                f"({current_penalty_rate(loan['overdue_count']) * 100:.0f}% penalty)"
+        if lender_id == borrower_id:
+            await interaction.response.send_message(
+                "🚫 You can't borrow from yourself.",
+                ephemeral=True,
             )
-            for loan in overdue_loans
-        ]
+            return
+
+        if lender.bot:
+            await interaction.response.send_message(
+                "🤖 Bots don't lend money.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            principal = db.parse_amount(amount)
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Invalid amount.\n"
+                "Examples: `1k`, `500k`, `2m`, `1b`, `1t`.",
+                ephemeral=True,
+            )
+            return
+
+        if principal <= 0:
+            await interaction.response.send_message(
+                "❌ Amount must be greater than 0.",
+                ephemeral=True,
+            )
+            return
+
+        conn = get_conn()
+
+        active_loans = conn.execute(
+            """
+            SELECT *
+            FROM loans
+            WHERE borrower = ?
+            AND status = 'active'
+            """,
+            (borrower_id,),
+        ).fetchall()
+
+        overdue_loans = []
+
+        for loan_row in active_loans:
+            loan_row = escalate_if_overdue(conn, loan_row)
+
+            if is_overdue(loan_row):
+                overdue_loans.append(loan_row)
+
+        conn.close()
+
+        if overdue_loans:
+            lines = [
+                (
+                    f"`{loan['id']}`: "
+                    f"**{db.format_peso(loan['remaining'])}** "
+                    f"owed to <@{loan['lender']}> "
+                    f"— overdue <t:{loan['due_date']}:R>\n"
+                    f"Escalated: {loan['overdue_count']}x "
+                    f"({current_penalty_rate(loan['overdue_count']) * 100:.0f}% penalty)"
+                )
+                for loan in overdue_loans
+            ]
+
+            await interaction.response.send_message(
+                "🚫 You still have overdue loans:\n\n"
+                + "\n\n".join(lines)
+                + "\n\nPay them first using `/loan pay`.",
+                ephemeral=True,
+            )
+            return
+
+        total_due = round(
+            principal * (1 + LOAN_INTEREST_RATE)
+        )
+
+        due_dt = (
+            datetime.now(timezone.utc)
+            + timedelta(days=LOAN_DUE_DAYS)
+        )
+
+        due_ts = int(
+            due_dt.timestamp()
+        )
+
+        request_id = self._next_request_id
+        self._next_request_id += 1
+
+        view = LoanRequestView(
+            cog=self,
+            request_id=request_id,
+            borrower=borrower,
+            lender=lender,
+            principal=principal,
+            total_due=total_due,
+            due_ts=due_ts,
+        )
+
+        embed = discord.Embed(
+            title="💸 Loan Request",
+            color=WHITE,
+            description=(
+                f"👤 Borrower: {borrower.mention}\n"
+                f"💰 Amount: **{db.format_peso(principal)}**\n"
+                f"📈 Repayment: **{db.format_peso(total_due)}** "
+                f"({int(LOAN_INTEREST_RATE * 100)}% interest)\n"
+                f"📅 Due: <t:{due_ts}:D>"
+            ),
+        )
+
+        embed.set_footer(
+            text=(
+                f"Request ID: {request_id} • "
+                f"Expires in {LOAN_REQUEST_TIMEOUT_SECONDS} seconds"
+            )
+        )
 
         await interaction.response.send_message(
-            "🚫 You still have overdue loans:\n\n"
-            + "\n\n".join(lines)
-            + "\n\nPay them first using `/loan pay`.",
-            ephemeral=True,
+            content=lender.mention,
+            embed=embed,
+            view=view,
         )
-        return
 
-    total_due = round(
-        principal * (1 + LOAN_INTEREST_RATE)
-    )
+        view.message = await interaction.original_response()
 
-    due_dt = (
-        datetime.now(timezone.utc)
-        + timedelta(days=LOAN_DUE_DAYS)
-    )
-
-    due_ts = int(
-        due_dt.timestamp()
-    )
-
-    request_id = self._next_request_id
-    self._next_request_id += 1
-
-    view = LoanRequestView(
-        cog=self,
-        request_id=request_id,
-        borrower=borrower,
-        lender=lender,
-        principal=principal,
-        total_due=total_due,
-        due_ts=due_ts,
-    )
-
-    embed = discord.Embed(
-        title="💸 Loan Request",
-        color=WHITE,
-        description=(
-            f"👤 Borrower: {borrower.mention}\n"
-            f"💰 Amount: **{db.format_peso(principal)}**\n"
-            f"📈 Repayment: **{db.format_peso(total_due)}** "
-            f"({int(LOAN_INTEREST_RATE * 100)}% interest)\n"
-            f"📅 Due: <t:{due_ts}:D>"
-        ),
-    )
-
-    embed.set_footer(
-        text=(
-            f"Request ID: {request_id} • "
-            f"Expires in {LOAN_REQUEST_TIMEOUT_SECONDS} seconds"
-        )
-    )
-
-    await interaction.response.send_message(
-        content=lender.mention,
-        embed=embed,
-        view=view,
-    )
-
-    view.message = await interaction.original_response()
-
-    self.pending_requests[request_id] = view
+        self.pending_requests[request_id] = view
 
        # ------------------------------------------------------- /loan pay
 
