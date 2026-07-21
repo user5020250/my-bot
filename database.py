@@ -68,6 +68,11 @@ def init_db() -> None:
             last_refresh INTEGER NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS lottery_entries (
+            user_id TEXT PRIMARY KEY,
+            tickets INTEGER NOT NULL DEFAULT 0
+        );
+
         CREATE TABLE IF NOT EXISTS debts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             lender TEXT NOT NULL,
