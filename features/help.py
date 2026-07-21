@@ -7,8 +7,6 @@ WHITE = discord.Color(0xFFFFFF)
 
 COMMANDS_PER_PAGE = 6
 
-INTRO = None
-
 CATEGORIES = [
     (
         "💰 Economy",
@@ -216,9 +214,9 @@ class HelpView(discord.ui.View):
         data = PAGES[self.page]
 
         embed = discord.Embed(
-    title=f"📖 Commands — {page['category']}",
-    color=WHITE,
-)
+            title=f"📖 Commands — {data['category']}",
+            color=WHITE,
+        )
 
         for name, desc in data["commands"]:
             embed.add_field(
@@ -237,7 +235,26 @@ class HelpView(discord.ui.View):
         self,
         interaction: discord.Interaction,
     ):
-        return interaction.user.id == self.author_id
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "❌ This isn't your help menu.",
+                ephemeral=True,
+            )
+            return False
+
+        return True
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+
+        if self.message:
+            try:
+                await self.message.edit(
+                    view=self
+                )
+            except discord.HTTPException:
+                pass
 
     @discord.ui.button(
         label="◀",
@@ -248,7 +265,9 @@ class HelpView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
-        self.page = (self.page - 1) % len(PAGES)
+        self.page = (
+            self.page - 1
+        ) % len(PAGES)
 
         await interaction.response.edit_message(
             embed=self.build_embed(),
@@ -264,8 +283,10 @@ class HelpView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
+        self.stop()
+
         await interaction.response.edit_message(
-            content="Help menu closed.",
+            content="👋 Help menu closed.",
             embed=None,
             view=None,
         )
@@ -279,7 +300,9 @@ class HelpView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
-        self.page = (self.page + 1) % len(PAGES)
+        self.page = (
+            self.page + 1
+        ) % len(PAGES)
 
         await interaction.response.edit_message(
             embed=self.build_embed(),
@@ -288,7 +311,10 @@ class HelpView(discord.ui.View):
 
 
 class Help(commands.Cog):
-    def __init__(self, bot):
+    def __init__(
+        self,
+        bot: commands.Bot,
+    ):
         self.bot = bot
 
     @app_commands.command(
@@ -299,15 +325,23 @@ class Help(commands.Cog):
         self,
         interaction: discord.Interaction,
     ):
-        view = HelpView(interaction.user.id)
+        view = HelpView(
+            interaction.user.id
+        )
 
         await interaction.response.send_message(
             embed=view.build_embed(),
             view=view,
         )
 
-        view.message = await interaction.original_response()
+        view.message = (
+            await interaction.original_response()
+        )
 
 
-async def setup(bot):
-    await bot.add_cog(Help(bot))
+async def setup(
+    bot: commands.Bot,
+):
+    await bot.add_cog(
+        Help(bot)
+    )
