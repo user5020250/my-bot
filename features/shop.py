@@ -10,23 +10,35 @@ from database import get_conn
 
 WHITE = discord.Color(0xFFFFFF)
 
-PADLOCK_COST = 50_000
 PADLOCK_DURATION_SECONDS = 24 * 60 * 60
-
 SHOP_REFRESH_SECONDS = 5 * 60
 
 SHOP_ITEMS = {
     "padlock": {
         "name": "Padlock",
         "emoji": "🔒",
-        "cost": PADLOCK_COST,
-        "description": (
-            f"Protects your balance from /steal for "
-            f"{PADLOCK_DURATION_SECONDS // 3600} hours."
-        ),
-
+        "cost": 5000,
+        "description": "Protects you from /steal for 24 hours.",
         "min_stock": 3,
         "max_stock": 10,
+    },
+
+    "lottery_ticket": {
+        "name": "Lottery Ticket",
+        "emoji": "🎟️",
+        "cost": 10_000,
+        "description": "Might be useful in the future.",
+        "min_stock": 5,
+        "max_stock": 15,
+    },
+
+    "burger": {
+        "name": "Burger",
+        "emoji": "🍔",
+        "cost": 500,
+        "description": "Just a burger.",
+        "min_stock": 10,
+        "max_stock": 25,
     },
 }
 
@@ -48,32 +60,8 @@ def get_protected_until(user_id: str) -> int:
     return row["protected_until"] if row else 0
 
 
-def get_item_stock(item_id: str) -> int:
-    conn = get_conn()
-
-    row = conn.execute(
-        """
-        SELECT stock
-        FROM shop_stock
-        WHERE item = ?
-        """,
-        (item_id,),
-    ).fetchone()
-
-    conn.close()
-
-    if row is None:
-        refresh_item_stock(item_id)
-
-        return get_item_stock(item_id)
-
-    return row["stock"]
-
-
 def refresh_item_stock(item_id: str):
     item = SHOP_ITEMS[item_id]
-
-    conn = get_conn()
 
     stock = random.randint(
         item["min_stock"],
@@ -81,6 +69,8 @@ def refresh_item_stock(item_id: str):
     )
 
     now = int(time.time())
+
+    conn = get_conn()
 
     conn.execute(
         """
@@ -136,6 +126,26 @@ def refresh_shop():
     conn.close()
 
 
+def get_item_stock(item_id: str) -> int:
+    conn = get_conn()
+
+    row = conn.execute(
+        """
+        SELECT stock
+        FROM shop_stock
+        WHERE item = ?
+        """,
+        (item_id,),
+    ).fetchone()
+
+    conn.close()
+
+    if row is None:
+        return 0
+
+    return row["stock"]
+
+
 def remove_stock(item_id: str):
     conn = get_conn()
 
@@ -156,6 +166,10 @@ class Shop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    # ==========================
+    # /balance
+    # ==========================
+
     @app_commands.command(
         name="balance",
         description="Check your balance.",
@@ -167,20 +181,20 @@ class Shop(commands.Cog):
     ):
         member = member or interaction.user
 
-        user = db.get_user(
-            str(member.id)
-        )
+        user = db.get_user(str(member.id))
 
         embed = discord.Embed(
             title=f"{member.display_name}'s Balance",
             color=WHITE,
         )
 
+        embed.set_thumbnail(
+            url=member.display_avatar.url
+        )
+
         embed.add_field(
-            name="💰 Money",
-            value=db.format_peso(
-                user["balance"]
-            ),
+            name="💰 Wallet",
+            value=f"`{db.format_peso(user['balance'])}`",
             inline=False,
         )
 
@@ -192,24 +206,22 @@ class Shop(commands.Cog):
 
         if protected_until > now:
             embed.add_field(
-                name="🔒 Protection",
-                value=db.format_duration(
-                    protected_until - now
-                ),
+                name="🔒 Padlock",
+                value=f"`{db.format_duration(protected_until - now)}`",
                 inline=False,
             )
-
-        embed.set_thumbnail(
-            url=member.display_avatar.url
-        )
 
         await interaction.response.send_message(
             embed=embed
         )
 
+    # ==========================
+    # /shop
+    # ==========================
+
     @app_commands.command(
         name="shop",
-        description="View the shop.",
+        description="Browse the shop.",
     )
     async def shop(
         self,
@@ -220,7 +232,7 @@ class Shop(commands.Cog):
         embed = discord.Embed(
             title="🛒 Shop",
             description=(
-                "Items refresh every 5 minutes.\n"
+                "Stock refreshes every `5 minutes`.\n"
                 "Use `/buy <item>`."
             ),
             color=WHITE,
@@ -228,9 +240,7 @@ class Shop(commands.Cog):
 
         for item_id, item in SHOP_ITEMS.items():
 
-            stock = get_item_stock(
-                item_id
-            )
+            stock = get_item_stock(item_id)
 
             embed.add_field(
                 name=(
@@ -238,8 +248,7 @@ class Shop(commands.Cog):
                     f"{item['name']}"
                 ),
                 value=(
-                    f"Price: "
-                    f"{db.format_peso(item['cost'])}\n"
+                    f"Price: `{db.format_peso(item['cost'])}`\n"
                     f"Stock: `{stock}`\n"
                     f"{item['description']}\n"
                     f"ID: `{item_id}`"
@@ -247,9 +256,17 @@ class Shop(commands.Cog):
                 inline=False,
             )
 
+        embed.set_footer(
+            text="Limited stock shop"
+        )
+
         await interaction.response.send_message(
             embed=embed
         )
+
+    # ==========================
+    # /buy
+    # ==========================
 
     @app_commands.command(
         name="buy",
@@ -270,14 +287,11 @@ class Shop(commands.Cog):
                 "❌ Item not found.",
                 ephemeral=True,
             )
-
             return
 
         shop_item = SHOP_ITEMS[item]
 
-        stock = get_item_stock(
-            item
-        )
+        stock = get_item_stock(item)
 
         if stock <= 0:
 
@@ -285,28 +299,23 @@ class Shop(commands.Cog):
                 "❌ This item is out of stock.",
                 ephemeral=True,
             )
-
             return
 
-        user_id = str(
-            interaction.user.id
-        )
+        user_id = str(interaction.user.id)
 
-        user = db.get_user(
-            user_id
-        )
+        user = db.get_user(user_id)
 
         if user["balance"] < shop_item["cost"]:
 
             await interaction.response.send_message(
                 (
-                    "❌ You don't have enough money.\n\n"
-                    f"Needed: {db.format_peso(shop_item['cost'])}\n"
-                    f"Balance: {db.format_peso(user['balance'])}"
+                    f"❌ You need "
+                    f"`{db.format_peso(shop_item['cost'])}`.\n"
+                    f"Current balance: "
+                    f"`{db.format_peso(user['balance'])}`"
                 ),
                 ephemeral=True,
             )
-
             return
 
         new_balance = db.add_balance(
@@ -323,15 +332,48 @@ class Shop(commands.Cog):
 
         remove_stock(item)
 
-        await interaction.response.send_message(
-            (
-                f"✅ Bought "
+        embed = discord.Embed(
+            title="🛒 Purchase Complete",
+            color=WHITE,
+        )
+
+        embed.set_thumbnail(
+            url=interaction.user.display_avatar.url
+        )
+
+        embed.add_field(
+            name="📦 Item",
+            value=(
                 f"{shop_item['emoji']} "
-                f"**{shop_item['name']}**.\n\n"
-                f"Balance: "
-                f"{db.format_peso(new_balance)}\n"
-                f"Stock left: `{stock - 1}`"
-            )
+                f"`{shop_item['name']}`"
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💸 Cost",
+            value=f"`{db.format_peso(shop_item['cost'])}`",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="📉 Stock Left",
+            value=f"`{stock - 1}`",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💰 New Balance",
+            value=f"`{db.format_peso(new_balance)}`",
+            inline=False,
+        )
+
+        embed.set_footer(
+            text="Use /inventory to see your items."
+        )
+
+        await interaction.response.send_message(
+            embed=embed
         )
 
 
