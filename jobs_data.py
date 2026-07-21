@@ -46,4 +46,4 @@ JOBS = {
     },
 }
 
-TRABAHO_COOLDOWN_SECONDS = 30 * 60  # 30 minutes
+TRABAHO_COOLDOWN_SECONDS = 86400  # 24 hrs
