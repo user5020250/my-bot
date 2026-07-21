@@ -21,9 +21,7 @@ def get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(
         DB_PATH
     )
-
     conn.row_factory = sqlite3.Row
-
     return conn
 
 
@@ -34,41 +32,41 @@ def init_db() -> None:
         """
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
-
             balance INTEGER NOT NULL DEFAULT 1000,
             job TEXT DEFAULT NULL,
-
             last_trabaho INTEGER NOT NULL DEFAULT 0,
             last_tambay INTEGER NOT NULL DEFAULT 0,
             last_sideline INTEGER NOT NULL DEFAULT 0,
-
             last_budol INTEGER NOT NULL DEFAULT 0,
             last_baon INTEGER NOT NULL DEFAULT 0,
             last_karaoke INTEGER NOT NULL DEFAULT 0
         );
-
         CREATE TABLE IF NOT EXISTS debts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-
             lender TEXT NOT NULL,
             borrower TEXT NOT NULL,
-
             amount INTEGER NOT NULL,
-
             created_at INTEGER NOT NULL
         );
-
         CREATE TABLE IF NOT EXISTS inventory (
             user_id TEXT NOT NULL,
             item TEXT NOT NULL,
-
             qty INTEGER NOT NULL DEFAULT 0,
             avg_buy_price INTEGER NOT NULL DEFAULT 0,
-
             PRIMARY KEY (
                 user_id,
                 item
             )
+        );
+        CREATE TABLE IF NOT EXISTS loans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lender TEXT NOT NULL,
+            borrower TEXT NOT NULL,
+            principal INTEGER NOT NULL,
+            remaining INTEGER NOT NULL,
+            due_date INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at INTEGER NOT NULL
         );
         """
     )
