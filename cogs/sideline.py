@@ -1,0 +1,91 @@
+import random
+import time
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+import db_utils as db
+
+WHITE = discord.Color(0xFFFFFF)
+
+SIDELINE_COOLDOWN_SECONDS = 60
+
+
+class Sideline(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+    @app_commands.command(
+        name="sideline",
+        description="Do a random side hustle."
+    )
+    async def sideline(
+        self,
+        interaction: discord.Interaction,
+    ):
+        user_id = str(interaction.user.id)
+
+        remaining = db.check_cooldown(
+            user_id,
+            "last_sideline",
+            SIDELINE_COOLDOWN_SECONDS,
+        )
+
+        if remaining > 0:
+            await interaction.response.send_message(
+                f"You already worked your sideline.\n"
+                f"Come back in **{db.format_duration(remaining)}**."
+            )
+            return
+
+        db.set_cooldown(
+            user_id,
+            "last_sideline",
+            int(time.time()),
+        )
+
+        jobs = [
+            ("You delivered food orders.", 150, 400),
+            ("You washed motorcycles.", 100, 300),
+            ("You sold snacks outside school.", 120, 350),
+            ("You worked at a sari-sari store.", 150, 350),
+            ("You helped a construction worker.", 250, 600),
+            ("You sold fish at the market.", 200, 500),
+            ("You carried sacks of rice.", 250, 700),
+        ]
+
+        message, minimum, maximum = random.choice(jobs)
+
+        earnings = random.randint(
+            minimum,
+            maximum,
+        )
+
+        new_balance = db.add_balance(
+            user_id,
+            earnings,
+        )
+
+        embed = discord.Embed(
+            title="Sideline",
+            description=(
+                f"{message}\n\n"
+                f"You earned **{db.format_peso(earnings)}**."
+            ),
+            color=WHITE,
+        )
+
+        embed.set_footer(
+            text=f"Balance: {db.format_peso(new_balance)}"
+        )
+
+        await interaction.response.send_message(
+            embed=embed
+        )
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(
+        Sideline(bot)
+    )
