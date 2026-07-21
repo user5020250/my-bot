@@ -19,16 +19,11 @@ CATEGORIES = [
                 "View all available jobs and see how much each one pays.",
             ),
             (
-                "/trabaho job: [job]",
-                "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 10 mins.",
+                "/work: [job]",
+                "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 8 hours.",
             ),
             (
-                "/tambay",
-                "Hang out with the barkada for a chance to earn some quick cash. "
-                "70% chance to win, 30% chance to lose money on snacks or yosi. Cooldown: 1 minute.",
-            ),
-            (
-                "/sugal amount: [₱]",
+                "/scatter: [₱]",
                 "Flip a coin and bet your money. Win big or lose everything. No cooldown.",
             ),
             (
@@ -36,9 +31,21 @@ CATEGORIES = [
                 "Sing for tips and earn ₱50–₱500. Cooldown: 5 minutes.",
             ),
             (
-                "/baon",
+                "/allowance",
                 "Claim your daily allowance of ₱50–₱100. Cooldown: 24 hours.",
             ),
+            (
+                "/daily"
+                "Claim your daily reward."
+            ),
+            (
+                "/weekly"
+                "Claim your weekly reward."
+            ),
+            (
+                "/yearly"
+                "Claim your yearly reward."
+            ),  
         ],
     ),
     (
