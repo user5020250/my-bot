@@ -2,7 +2,11 @@ import os
 import sqlite3
 
 DATA_DIR = os.getenv("DATA_DIR", "data")
-os.makedirs(DATA_DIR, exist_ok=True)
+
+os.makedirs(
+    DATA_DIR,
+    exist_ok=True,
+)
 
 DB_PATH = os.path.join(
     DATA_DIR,
@@ -56,21 +60,30 @@ def init_db() -> None:
             user_id TEXT NOT NULL,
             item TEXT NOT NULL,
             qty INTEGER NOT NULL DEFAULT 0,
+
             avg_buy_price INTEGER NOT NULL DEFAULT 0,
+
             PRIMARY KEY (user_id, item)
         );
         """
     )
 
-    try:
+    columns = [
+        row["name"]
+        for row in conn.execute(
+            "PRAGMA table_info(inventory)"
+        ).fetchall()
+    ]
+
+    if "avg_buy_price" not in columns:
         conn.execute(
             """
             ALTER TABLE inventory
-            ADD COLUMN avg_buy_price INTEGER NOT NULL DEFAULT 0
+            ADD COLUMN avg_buy_price
+            INTEGER NOT NULL DEFAULT 0
             """
         )
-    except sqlite3.OperationalError:
-        pass
 
     conn.commit()
+
     conn.close()
