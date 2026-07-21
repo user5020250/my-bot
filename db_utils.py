@@ -26,10 +26,89 @@ _ALLOWED_COOLDOWN_FIELDS = {
 # LOTTERY
 # ==========================================================
 
+def create_lottery(
+    prize: int,
+) -> None:
+
+    conn = get_conn()
+
+    conn.execute(
+        """
+        DELETE FROM lottery
+        """
+    )
+
+    conn.execute(
+        """
+        INSERT INTO lottery (
+            id,
+            prize,
+            active
+        )
+        VALUES (
+            1,
+            ?,
+            1
+        )
+        """,
+        (
+            prize,
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_lottery() -> dict | None:
+
+    conn = get_conn()
+
+    row = conn.execute(
+        """
+        SELECT *
+        FROM lottery
+        WHERE id = 1
+        """
+    ).fetchone()
+
+    conn.close()
+
+    if row is None:
+        return None
+
+    return dict(row)
+
+
+def end_lottery() -> None:
+
+    conn = get_conn()
+
+    conn.execute(
+        """
+        DELETE FROM lottery
+        """
+    )
+
+    conn.execute(
+        """
+        DELETE FROM lottery_entries
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
 def join_lottery(
     user_id: str,
     tickets: int = 1,
 ) -> bool:
+
+    lottery = get_lottery()
+
+    if lottery is None:
+        return False
 
     if tickets <= 0:
         return False
@@ -43,7 +122,7 @@ def join_lottery(
 
     conn = get_conn()
 
-    current = conn.execute(
+    row = conn.execute(
         """
         SELECT tickets
         FROM lottery_entries
@@ -56,8 +135,13 @@ def join_lottery(
 
     current_tickets = 0
 
-    if current:
-        current_tickets = current["tickets"]
+    if row:
+        current_tickets = row["tickets"]
+
+    new_total = (
+        current_tickets
+        + tickets
+    )
 
     conn.execute(
         """
@@ -70,12 +154,11 @@ def join_lottery(
         ON CONFLICT(user_id)
 
         DO UPDATE SET
-            tickets = ?
+            tickets = excluded.tickets
         """,
         (
             user_id,
-            current_tickets + tickets,
-            current_tickets + tickets,
+            new_total,
         ),
     )
 
@@ -108,20 +191,6 @@ def get_lottery_entries() -> list[dict]:
         dict(row)
         for row in rows
     ]
-
-
-def clear_lottery_entries():
-
-    conn = get_conn()
-
-    conn.execute(
-        """
-        DELETE FROM lottery_entries
-        """
-    )
-
-    conn.commit()
-    conn.close()
 
 # ==========================================================
 # USERS
