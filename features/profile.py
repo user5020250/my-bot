@@ -70,7 +70,9 @@ class Profile(commands.Cog):
             user_id
         )
 
-        unique_items = len(inventory)
+        unique_items = len(
+            inventory
+        )
 
         total_items = sum(
             item["qty"]
@@ -82,7 +84,7 @@ class Profile(commands.Cog):
         )
 
         embed.set_author(
-            name=target.display_name,
+            name=f"{target.display_name}'s Profile",
             icon_url=target.display_avatar.url,
         )
 
@@ -93,8 +95,8 @@ class Profile(commands.Cog):
         embed.add_field(
             name="💰 Money",
             value=(
-                f"Wallet: **{db.format_peso(data['balance'])}**\n"
-                f"Net Worth: **{db.format_peso(data['balance'])}**"
+                f"Wallet: `{db.format_peso(data['balance'])}`\n"
+                f"Net Worth: `{db.format_peso(data['balance'])}`"
             ),
             inline=True,
         )
@@ -102,7 +104,7 @@ class Profile(commands.Cog):
         embed.add_field(
             name="💼 Job",
             value=(
-                f"Current: **{job_label}**"
+                f"Current: `{job_label}`"
             ),
             inline=True,
         )
@@ -110,8 +112,8 @@ class Profile(commands.Cog):
         embed.add_field(
             name="🎒 Inventory",
             value=(
-                f"Unique: **{unique_items}**\n"
-                f"Total: **{total_items}**"
+                f"Unique: `{unique_items}`\n"
+                f"Total: `{total_items}`"
             ),
             inline=True,
         )
@@ -120,9 +122,9 @@ class Profile(commands.Cog):
             name="⚡ Cooldowns",
             value=(
                 f"Work: "
-                f"{'✅ Ready' if trabaho_cd == 0 else db.format_duration(trabaho_cd)}\n"
+                f"`{'Ready' if trabaho_cd == 0 else db.format_duration(trabaho_cd)}`\n"
                 f"Tambay: "
-                f"{'✅ Ready' if tambay_cd == 0 else db.format_duration(tambay_cd)}"
+                f"`{'Ready' if tambay_cd == 0 else db.format_duration(tambay_cd)}`"
             ),
             inline=True,
         )
@@ -131,9 +133,9 @@ class Profile(commands.Cog):
             name="🎤 Activities",
             value=(
                 f"Karaoke: "
-                f"{'✅ Ready' if karaoke_cd == 0 else db.format_duration(karaoke_cd)}\n"
+                f"`{'Ready' if karaoke_cd == 0 else db.format_duration(karaoke_cd)}`\n"
                 f"Baon: "
-                f"{'✅ Ready' if baon_cd == 0 else db.format_duration(baon_cd)}"
+                f"`{'Ready' if baon_cd == 0 else db.format_duration(baon_cd)}`"
             ),
             inline=True,
         )
@@ -141,7 +143,7 @@ class Profile(commands.Cog):
         embed.add_field(
             name="📋 Information",
             value=(
-                f"ID:\n"
+                f"User ID:\n"
                 f"`{target.id}`"
             ),
             inline=True,
