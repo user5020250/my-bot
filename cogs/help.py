@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-WHITE = discord.Color.white()
+WHITE = discord.Color(0xFFFFFF)
 COMMANDS_PER_PAGE = 5
 
 INTRO = (
