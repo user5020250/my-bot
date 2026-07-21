@@ -6,10 +6,11 @@ from discord.ext import commands
 import db_utils as db
 from jobs_data import JOBS, TRABAHO_COOLDOWN_SECONDS
 
-WHITE = discord.Color(0xFFFFFF)
+WHITE = discord.Color(0x2B2D31)
 
 TAMBAY_COOLDOWN_SECONDS = 60
 BAON_COOLDOWN_SECONDS = 24 * 60 * 60
+KARAOKE_COOLDOWN_SECONDS = 60
 
 
 class Profile(commands.Cog):
@@ -29,8 +30,9 @@ class Profile(commands.Cog):
         user: discord.Member = None,
     ):
         target = user or interaction.user
+        user_id = str(target.id)
 
-        data = db.get_user(str(target.id))
+        data = db.get_user(user_id)
 
         job_key = data["job"]
 
@@ -41,26 +43,47 @@ class Profile(commands.Cog):
         )
 
         trabaho_cd = db.check_cooldown(
-            str(target.id),
+            user_id,
             "last_trabaho",
             TRABAHO_COOLDOWN_SECONDS,
         )
 
         tambay_cd = db.check_cooldown(
-            str(target.id),
+            user_id,
             "last_tambay",
             TAMBAY_COOLDOWN_SECONDS,
         )
 
         baon_cd = db.check_cooldown(
-            str(target.id),
+            user_id,
             "last_baon",
             BAON_COOLDOWN_SECONDS,
         )
 
+        karaoke_cd = db.check_cooldown(
+            user_id,
+            "last_karaoke",
+            KARAOKE_COOLDOWN_SECONDS,
+        )
+
+        inventory = db.get_all_inventory(
+            user_id
+        )
+
+        unique_items = len(inventory)
+
+        total_items = sum(
+            item["qty"]
+            for item in inventory
+        )
+
         embed = discord.Embed(
-            title=f"{target.display_name}'s Profile",
             color=WHITE,
+        )
+
+        embed.set_author(
+            name=target.display_name,
+            icon_url=target.display_avatar.url,
         )
 
         embed.set_thumbnail(
@@ -68,55 +91,64 @@ class Profile(commands.Cog):
         )
 
         embed.add_field(
-            name="Balance",
-            value=db.format_peso(data["balance"]),
-            inline=True,
-        )
-
-        embed.add_field(
-            name="Job",
-            value=job_label,
-            inline=True,
-        )
-
-        embed.add_field(
-            name="\u200b",
-            value="\u200b",
-            inline=True,
-        )
-
-        embed.add_field(
-            name="Trabaho",
+            name="💰 Money",
             value=(
-                "Ready"
-                if trabaho_cd == 0
-                else db.format_duration(trabaho_cd)
+                f"Wallet: **{db.format_peso(data['balance'])}**\n"
+                f"Net Worth: **{db.format_peso(data['balance'])}**"
             ),
             inline=True,
         )
 
         embed.add_field(
-            name="Tambay",
+            name="💼 Job",
             value=(
-                "Ready"
-                if tambay_cd == 0
-                else db.format_duration(tambay_cd)
+                f"Current: **{job_label}**"
             ),
             inline=True,
         )
 
         embed.add_field(
-            name="Baon",
+            name="🎒 Inventory",
             value=(
-                "Ready"
-                if baon_cd == 0
-                else db.format_duration(baon_cd)
+                f"Unique: **{unique_items}**\n"
+                f"Total: **{total_items}**"
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="⚡ Cooldowns",
+            value=(
+                f"Work: "
+                f"{'✅ Ready' if trabaho_cd == 0 else db.format_duration(trabaho_cd)}\n"
+                f"Tambay: "
+                f"{'✅ Ready' if tambay_cd == 0 else db.format_duration(tambay_cd)}"
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="🎤 Activities",
+            value=(
+                f"Karaoke: "
+                f"{'✅ Ready' if karaoke_cd == 0 else db.format_duration(karaoke_cd)}\n"
+                f"Baon: "
+                f"{'✅ Ready' if baon_cd == 0 else db.format_duration(baon_cd)}"
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="📋 Information",
+            value=(
+                f"ID:\n"
+                f"`{target.id}`"
             ),
             inline=True,
         )
 
         embed.set_footer(
-            text="Keep grinding."
+            text="Keep grinding 💸"
         )
 
         await interaction.response.send_message(
@@ -125,4 +157,6 @@ class Profile(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(Profile(bot))
+    await bot.add_cog(
+        Profile(bot)
+    )
