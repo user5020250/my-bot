@@ -10,6 +10,27 @@ ITEMS = {
     "padlock": {
         "emoji": "🔒",
         "name": "Padlock",
+        "description": (
+            "Protects you from /steal "
+            "for 24 hours."
+        ),
+    },
+
+    "lottery_ticket": {
+        "emoji": "🎟️",
+        "name": "Lottery Ticket",
+        "description": (
+            "Used automatically "
+            "when joining lotteries."
+        ),
+    },
+
+    "burger": {
+        "emoji": "🍔",
+        "name": "Burger",
+        "description": (
+            "Just a burger."
+        ),
     },
 }
 
@@ -28,20 +49,28 @@ class Inventory(commands.Cog):
     ):
         user_id = str(interaction.user.id)
 
-        items = db.get_all_inventory(user_id)
+        items = db.get_all_inventory(
+            user_id
+        )
 
         embed = discord.Embed(
-            title=f"🎒 {interaction.user.display_name}'s Inventory",
+            title=(
+                f"🎒 "
+                f"{interaction.user.display_name}'s Inventory"
+            ),
             color=WHITE,
         )
 
         if not items:
-            embed.description = "You don't own anything yet."
+
+            embed.description = (
+                "You don't own anything yet."
+            )
 
         else:
-            lines = []
 
             for row in items:
+
                 item_id = row["item"]
 
                 item_data = ITEMS.get(
@@ -49,16 +78,27 @@ class Inventory(commands.Cog):
                     {
                         "emoji": "📦",
                         "name": item_id.title(),
+                        "description": (
+                            "No description available."
+                        ),
                     },
                 )
 
-                lines.append(
-                    f"{item_data['emoji']} "
-                    f"**{item_data['name']}** "
-                    f"×{row['qty']}"
+                embed.add_field(
+                    name=(
+                        f"{item_data['emoji']} "
+                        f"{item_data['name']} "
+                        f"×{row['qty']}"
+                    ),
+                    value=(
+                        f"`{item_data['description']}`"
+                    ),
+                    inline=False,
                 )
 
-            embed.description = "\n".join(lines)
+        embed.set_footer(
+            text="Use `/use <item>` to use usable items."
+        )
 
         await interaction.response.send_message(
             embed=embed
