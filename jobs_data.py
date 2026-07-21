@@ -1,49 +1,48 @@
 """
-jobs_data.py — central place to tweak job names & pay ranges.
+jobs_data.py — tweak job names, payouts, and flavor text here.
 """
 
 JOBS = {
     "call_center": {
         "label": "Call Center Agent",
-        "emoji": "🎧",
         "min": 1500,
         "max": 4000,
-        "flavor": "Pumasok ng graveyard shift para sa mga Amerikanong customer.",
+        "flavor": "Nag-survive ng graveyard shift at nakipagbardagulan sa customers.",
     },
+
     "tricycle": {
         "label": "Tricycle Driver",
-        "emoji": "🛺",
         "min": 1000,
         "max": 2500,
-        "flavor": "Sunog-pahingahan sa tricycle terminal buong araw.",
+        "flavor": "Umikot buong barangay para kumita ng extra cash.",
     },
+
     "sari_sari": {
         "label": "Sari-Sari Store Owner",
-        "emoji": "🏪",
         "min": 1200,
         "max": 3500,
-        "flavor": "Nagbantay ng tindahan, nakipag-usap sa mga suki.",
+        "flavor": "Nagbantay ng tindahan at nakichika sa mga suki.",
     },
+
     "grab": {
         "label": "Grab Rider",
-        "emoji": "🏍️",
         "min": 1500,
         "max": 5000,
-        "flavor": "Nag-deliver ng food at pasahero buong shift.",
+        "flavor": "Nakipagsabayan sa traffic para ma-deliver ang orders.",
     },
+
     "construction": {
         "label": "Construction Worker",
-        "emoji": "🧱",
         "min": 1000,
         "max": 3000,
-        "flavor": "Nagpawis sa site, todo hakot ng semento at bakal.",
+        "flavor": "Nagbuhat ng semento at nagpakapagod sa site.",
     },
+
     "student_hustle": {
         "label": "Student Side Hustle",
-        "emoji": "🎓",
         "min": 500,
         "max": 2000,
-        "flavor": "Nagbenta ng baon, tumulong mag-tutor, freelance gigs.",
+        "flavor": "Kumita gamit ang side hustles imbes na mag-review.",
     },
 }
 
