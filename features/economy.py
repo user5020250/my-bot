@@ -162,76 +162,95 @@ class Economy(commands.Cog):
 
     # -------------------------------------------------------------- /scatter
 
-    @app_commands.command(
-        name="scatter",
-        description="50/50 gamble.",
+@app_commands.command(
+    name="scatter",
+    description="50/50 gamble.",
+)
+@app_commands.describe(
+    amount="Examples: 100k, 5m, 2b"
+)
+async def scatter(
+    self,
+    interaction: discord.Interaction,
+    amount: str,
+):
+    user_id = str(
+        interaction.user.id
     )
-    @app_commands.describe(
-        amount="Bet amount."
-    )
-    async def scatter(
-        self,
-        interaction: discord.Interaction,
-        amount: app_commands.Range[int, 1],
-    ):
-        user_id = str(
-            interaction.user.id
+
+    try:
+        amount = db.parse_money(
+            amount
         )
 
-        user = db.get_user(
-            user_id
-        )
-
-        if amount > user["balance"]:
-            await interaction.response.send_message(
-                f"You only have "
-                f"**{db.format_peso(user['balance'])}**."
-            )
-            return
-
-        win = random.random() < 0.5
-
-        if win:
-            new_balance = db.add_balance(
-                user_id,
-                amount,
-            )
-
-            embed = discord.Embed(
-                title="You Won",
-                description=(
-                    f"You won "
-                    f"**{db.format_peso(amount)}**."
-                ),
-                color=WHITE,
-            )
-
-        else:
-            new_balance = db.add_balance(
-                user_id,
-                -amount,
-            )
-
-            embed = discord.Embed(
-                title="You Lost",
-                description=(
-                    f"You lost "
-                    f"**{db.format_peso(amount)}**."
-                ),
-                color=WHITE,
-            )
-
-        embed.set_footer(
-            text=(
-                f"Balance: "
-                f"{db.format_peso(new_balance)}"
-            )
-        )
-
+    except ValueError:
         await interaction.response.send_message(
-            embed=embed
+            "❌ Invalid amount.\n"
+            "Examples: `100k`, `5m`, `2b`",
+            ephemeral=True,
+        )
+        return
+
+    if amount <= 0:
+        await interaction.response.send_message(
+            "❌ Invalid amount.",
+            ephemeral=True,
+        )
+        return
+
+    user = db.get_user(
+        user_id
+    )
+
+    if amount > user["balance"]:
+        await interaction.response.send_message(
+            f"You only have "
+            f"**{db.format_peso(user['balance'])}**."
+        )
+        return
+
+    win = random.random() < 0.5
+
+    if win:
+        new_balance = db.add_balance(
+            user_id,
+            amount,
         )
 
+        embed = discord.Embed(
+            title="🎉 You Won",
+            description=(
+                f"You won "
+                f"**{db.format_peso(amount)}**."
+            ),
+            color=WHITE,
+        )
+
+    else:
+        new_balance = db.add_balance(
+            user_id,
+            -amount,
+        )
+
+        embed = discord.Embed(
+            title="💀 You Lost",
+            description=(
+                f"You lost "
+                f"**{db.format_peso(amount)}**."
+            ),
+            color=WHITE,
+        )
+
+    embed.set_footer(
+        text=(
+            f"Balance: "
+            f"{db.format_peso(new_balance)}"
+        )
+    )
+
+    await interaction.response.send_message(
+        embed=embed
+    )
     # ------------------------------------------------------------- /allowance
 
     @app_commands.command(
