@@ -12,7 +12,7 @@ WHITE = discord.Color(0xFFFFFF)
 
 # ------------------------------------------------------------- constants
 
-COLLECT_INTERVAL_SECONDS = 4 * 60 * 60
+COLLECT_INTERVAL_SECONDS = 24 * 60 * 60  # once per day, like real daily income
 
 UPGRADE_MAX_LEVEL = 5
 UPGRADE_COST_MULTIPLIER = 1.8
@@ -55,103 +55,106 @@ MAINTENANCE_ISSUES = [
     "Nasira ang cash register / POS system",
 ]
 
-# Realistic-ish PHP capital + expected income for Filipino small and
-# medium businesses. Prices are based on typical real-world startup
-# capital ranges for each type of business, and income is tuned so
-# that consistently collecting (roughly every COLLECT_INTERVAL_SECONDS)
-# pays the business back over a plausible number of weeks — smaller
-# businesses recoup capital fast (hustle economy), bigger ones take
-# longer but earn proportionally more.
+# Realistic-ish PHP capital + net daily income for Filipino small and
+# medium businesses. "income" is the amount collectible once per day
+# (COLLECT_INTERVAL_SECONDS = 24h), tuned to roughly match what these
+# businesses actually net per day in the Philippines at a decent,
+# established scale — e.g. a taho vendor clearing a few hundred pesos
+# a day, vs. a resort netting tens of thousands. Payback period on
+# capital grows from about a week (small hustle) to a few months
+# (capital-heavy business), which also matches real life: small
+# vendors recoup fast on thin margins, big businesses take longer to
+# pay back but earn far more in absolute terms once established.
 BUSINESSES = {
     "taho_cart": {
         "name": "Taho Cart",
         "emoji": "🥣",
         "price": 4000,
-        "income": 90,
+        "income": 400,
     },
     "sari_sari": {
         "name": "Sari-sari Store",
         "emoji": "🏪",
         "price": 15000,
-        "income": 130,
+        "income": 500,
     },
     "fish_stall": {
         "name": "Fish Stall",
         "emoji": "🐟",
         "price": 25000,
-        "income": 180,
+        "income": 700,
     },
     "carinderia": {
         "name": "Carinderia",
         "emoji": "🍲",
         "price": 45000,
-        "income": 300,
+        "income": 1200,
     },
     "internet_cafe": {
         "name": "Internet Café",
         "emoji": "💻",
         "price": 120000,
-        "income": 550,
+        "income": 2200,
     },
     "laundry_shop": {
         "name": "Laundry Shop",
         "emoji": "🧺",
         "price": 150000,
-        "income": 650,
+        "income": 2600,
     },
     "rice_farm": {
         "name": "Rice Farm",
         "emoji": "🌾",
         "price": 200000,
-        "income": 800,
+        "income": 3200,
     },
     "coconut_plantation": {
         "name": "Coconut Plantation",
         "emoji": "🥥",
         "price": 250000,
-        "income": 950,
+        "income": 3800,
     },
     "milk_tea_shop": {
         "name": "Milk Tea Shop",
         "emoji": "🧋",
         "price": 350000,
-        "income": 1250,
+        "income": 5000,
     },
     "water_refilling": {
         "name": "Water Refilling Station",
         "emoji": "💧",
         "price": 400000,
-        "income": 1400,
+        "income": 5600,
     },
     "computer_shop": {
         "name": "Computer Shop",
         "emoji": "🖥️",
         "price": 550000,
-        "income": 1800,
+        "income": 7200,
     },
     "convenience_store": {
         "name": "Convenience Store",
         "emoji": "🏬",
         "price": 700000,
-        "income": 2200,
+        "income": 8800,
     },
     "delivery_service": {
         "name": "Delivery Service",
         "emoji": "🛵",
         "price": 900000,
-        "income": 2700,
+        "income": 10800,
     },
     "jeepney_franchise": {
         "name": "Jeepney Franchise",
         "emoji": "🚙",
         "price": 1200000,
-        "income": 3400,
+        "income": 13600,
     },
     "resort": {
         "name": "Resort",
         "emoji": "🏖️",
         "price": 3000000,
-        "income": 7500,
+        "income": 30000,
     },
 }
 
@@ -309,8 +312,7 @@ class Business(commands.Cog):
         lines = [
             f"{info['emoji']} **{info['name']}** — "
             f"{db.format_peso(info['price'])} "
-            f"(income: {db.format_peso(info['income'])} / "
-            f"{COLLECT_INTERVAL_SECONDS // 3600}h)"
+            f"(income: {db.format_peso(info['income'])} / day)"
             for info in BUSINESSES.values()
         ]
 
@@ -928,7 +930,7 @@ class Business(commands.Cog):
                 f"Na-upgrade ang {business_label(key)} sa "
                 f"**Level {new_level}**.\n"
                 f"Bagong income: **{db.format_peso(new_income)}** "
-                f"per collect."
+                f"per day."
             ),
             color=WHITE,
         )
@@ -986,7 +988,7 @@ class Business(commands.Cog):
 
         description = (
             f"Level: **{owned['level']}** / {UPGRADE_MAX_LEVEL}\n"
-            f"Income per collect: **{db.format_peso(current_income)}**\n"
+            f"Income per day: **{db.format_peso(current_income)}**\n"
             f"Lifetime earnings: **{db.format_peso(owned['lifetime_earnings'])}**\n"
             f"Next upgrade cost: **{next_upgrade}**\n"
             f"Purchased: <t:{owned['purchased_at']}:D>"
