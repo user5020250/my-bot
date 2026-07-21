@@ -13,11 +13,11 @@ CATEGORIES = [
         [
             (
                 "💼 /jobs",
-                "View all available jobs and see how much each one pays.",
+                "`View all available jobs and see how much each one pays.`",
             ),
             (
                 "👔 /work [job]",
-                "Choose or switch jobs. Run `/work` without selecting a job to earn money. Cooldown: 8 hours.",
+                "`Choose or switch jobs. Run `/work` without selecting a job to earn money. Cooldown: 8 hours.`",
             ),
             (
                 "🎰 /scatter [amount]",
