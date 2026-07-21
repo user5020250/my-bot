@@ -5,6 +5,11 @@ from discord.ext import commands
 WHITE = discord.Color(0xFFFFFF)
 COMMANDS_PER_PAGE = 5
 
+INTRO = (
+    "Starting money: **₱1,000**. Everything's in pesos (₱). Use the arrows below to "
+    "browse commands, or hit ✖ to close this menu whenever you're done. Let's get this bread."
+)
+
 COMMANDS = [
     (
         "💼 /jobs",
