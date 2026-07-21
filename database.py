@@ -74,6 +74,17 @@ def init_db() -> None:
     active INTEGER NOT NULL DEFAULT 1
 );
 
+conn.execute(
+    """
+    CREATE TABLE IF NOT EXISTS lotteries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        prize INTEGER NOT NULL,
+        ends_at INTEGER NOT NULL,
+        created_by TEXT NOT NULL
+    )
+    """
+)
+
 CREATE TABLE IF NOT EXISTS lottery_entries (
     user_id TEXT PRIMARY KEY,
     tickets INTEGER NOT NULL DEFAULT 0
