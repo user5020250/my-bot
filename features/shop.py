@@ -19,8 +19,8 @@ SHOP_ITEMS = {
         "emoji": "🔒",
         "cost": 5000,
         "description": "Protects you from /steal for 24 hours.",
-        "min_stock": 3,
-        "max_stock": 10,
+        "min_stock": 1,
+        "max_stock": 3,
     },
 
     "lottery_ticket": {
@@ -28,8 +28,8 @@ SHOP_ITEMS = {
         "emoji": "🎟️",
         "cost": 10_000,
         "description": "Might be useful in the future.",
-        "min_stock": 5,
-        "max_stock": 15,
+        "min_stock": 0,
+        "max_stock": 5,
     },
 
     "burger": {
@@ -37,8 +37,8 @@ SHOP_ITEMS = {
         "emoji": "🍔",
         "cost": 500,
         "description": "Just a burger.",
-        "min_stock": 10,
-        "max_stock": 25,
+        "min_stock": 1,
+        "max_stock": 10,
     },
 }
 
@@ -232,7 +232,6 @@ class Shop(commands.Cog):
         embed = discord.Embed(
             title="🛒 Shop",
             description=(
-                "Stock refreshes every `5 minutes`.\n"
                 "Use `/buy <item>`."
             ),
             color=WHITE,
@@ -257,7 +256,7 @@ class Shop(commands.Cog):
             )
 
         embed.set_footer(
-            text="Limited stock shop"
+            text="Stock refreshes every `5 minutes`."
         )
 
         await interaction.response.send_message(
