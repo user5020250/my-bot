@@ -31,97 +31,127 @@ RAID_FAIL_PENALTY_MAX = 1500
 DEFEND_DURATION_SECONDS = 6 * 60 * 60
 DEFEND_COST = 1000
 
-# Filipino small/medium businesses only.
+# After each successful collection, there's a chance the business
+# breaks down and needs a repair paid before it earns again.
+# Bigger/more complex businesses (equipment-heavy) break down a
+# little more often than a simple cart.
+MAINTENANCE_BASE_CHANCE = 0.10
+MAINTENANCE_CHANCE_PER_LEVEL = 0.015  # more equipment/wear at higher levels
+REPAIR_COST_MIN_RATE = 0.03  # % of purchase price
+REPAIR_COST_MAX_RATE = 0.09
+
+MAINTENANCE_ISSUES = [
+    "Nasira ang gripo/tubo",
+    "Nag-aberya ang generator",
+    "Kailangan ng bagong compressor",
+    "Nasunugan ang de-koryenteng wiring",
+    "Nabasag ang mga gamit/kagamitan",
+    "May leak sa bubong",
+    "Nasira ang aircon/refrigeration unit",
+    "Kailangan ng pahinga ang mga makina",
+    "Baha sa loob ng tindahan",
+    "Kailangan ng bagong parts para sa makina",
+    "Nagalit ang barangay dahil sa permit — kailangan i-renew",
+    "Nasira ang cash register / POS system",
+]
+
+# Realistic-ish PHP capital + expected income for Filipino small and
+# medium businesses. Prices are based on typical real-world startup
+# capital ranges for each type of business, and income is tuned so
+# that consistently collecting (roughly every COLLECT_INTERVAL_SECONDS)
+# pays the business back over a plausible number of weeks — smaller
+# businesses recoup capital fast (hustle economy), bigger ones take
+# longer but earn proportionally more.
 BUSINESSES = {
     "taho_cart": {
         "name": "Taho Cart",
         "emoji": "🥣",
-        "price": 1500,
-        "income": 120,
+        "price": 4000,
+        "income": 90,
     },
     "sari_sari": {
         "name": "Sari-sari Store",
         "emoji": "🏪",
-        "price": 2000,
-        "income": 150,
+        "price": 15000,
+        "income": 130,
     },
     "fish_stall": {
         "name": "Fish Stall",
         "emoji": "🐟",
-        "price": 3000,
-        "income": 220,
+        "price": 25000,
+        "income": 180,
     },
     "carinderia": {
         "name": "Carinderia",
         "emoji": "🍲",
-        "price": 5000,
-        "income": 380,
+        "price": 45000,
+        "income": 300,
     },
     "internet_cafe": {
         "name": "Internet Café",
         "emoji": "💻",
-        "price": 8000,
-        "income": 600,
+        "price": 120000,
+        "income": 550,
     },
     "laundry_shop": {
         "name": "Laundry Shop",
         "emoji": "🧺",
-        "price": 9000,
-        "income": 680,
+        "price": 150000,
+        "income": 650,
     },
     "rice_farm": {
         "name": "Rice Farm",
         "emoji": "🌾",
-        "price": 10000,
-        "income": 750,
+        "price": 200000,
+        "income": 800,
     },
     "coconut_plantation": {
         "name": "Coconut Plantation",
         "emoji": "🥥",
-        "price": 12000,
-        "income": 900,
+        "price": 250000,
+        "income": 950,
     },
     "milk_tea_shop": {
         "name": "Milk Tea Shop",
         "emoji": "🧋",
-        "price": 14000,
-        "income": 1050,
+        "price": 350000,
+        "income": 1250,
     },
     "water_refilling": {
         "name": "Water Refilling Station",
         "emoji": "💧",
-        "price": 15000,
-        "income": 1100,
+        "price": 400000,
+        "income": 1400,
     },
     "computer_shop": {
         "name": "Computer Shop",
         "emoji": "🖥️",
-        "price": 18000,
-        "income": 1350,
+        "price": 550000,
+        "income": 1800,
     },
     "convenience_store": {
         "name": "Convenience Store",
         "emoji": "🏬",
-        "price": 20000,
-        "income": 1500,
+        "price": 700000,
+        "income": 2200,
     },
     "delivery_service": {
         "name": "Delivery Service",
         "emoji": "🛵",
-        "price": 25000,
-        "income": 1900,
+        "price": 900000,
+        "income": 2700,
     },
     "jeepney_franchise": {
         "name": "Jeepney Franchise",
         "emoji": "🚙",
-        "price": 35000,
-        "income": 2700,
+        "price": 1200000,
+        "income": 3400,
     },
     "resort": {
         "name": "Resort",
         "emoji": "🏖️",
-        "price": 60000,
-        "income": 4800,
+        "price": 3000000,
+        "income": 7500,
     },
 }
 
@@ -147,6 +177,10 @@ def ensure_business_tables():
             last_collected INTEGER NOT NULL,
             lifetime_earnings INTEGER NOT NULL DEFAULT 0,
             purchased_at INTEGER NOT NULL,
+            broken INTEGER NOT NULL DEFAULT 0,
+            repair_cost INTEGER NOT NULL DEFAULT 0,
+            repair_reason TEXT,
+            broken_since INTEGER,
             UNIQUE (
                 user_id,
                 business_key
@@ -159,6 +193,32 @@ def ensure_business_tables():
         );
         """
     )
+
+    # Migrate databases created before the repair/maintenance columns
+    # existed, so this doesn't break on existing installs.
+    existing_cols = {
+        row["name"] for row in conn.execute("PRAGMA table_info(owned_businesses)")
+    }
+
+    if "broken" not in existing_cols:
+        conn.execute(
+            "ALTER TABLE owned_businesses ADD COLUMN broken INTEGER NOT NULL DEFAULT 0"
+        )
+
+    if "repair_cost" not in existing_cols:
+        conn.execute(
+            "ALTER TABLE owned_businesses ADD COLUMN repair_cost INTEGER NOT NULL DEFAULT 0"
+        )
+
+    if "repair_reason" not in existing_cols:
+        conn.execute(
+            "ALTER TABLE owned_businesses ADD COLUMN repair_reason TEXT"
+        )
+
+    if "broken_since" not in existing_cols:
+        conn.execute(
+            "ALTER TABLE owned_businesses ADD COLUMN broken_since INTEGER"
+        )
 
     conn.commit()
     conn.close()
@@ -185,6 +245,18 @@ def upgrade_cost(base_price: int, level: int) -> int:
         * 0.5
         * (UPGRADE_COST_MULTIPLIER ** (level - 1))
     )
+
+
+def maintenance_chance(level: int) -> float:
+    return MAINTENANCE_BASE_CHANCE + MAINTENANCE_CHANCE_PER_LEVEL * (level - 1)
+
+
+def roll_repair_cost(base_price: int, level: int) -> int:
+    rate = random.uniform(REPAIR_COST_MIN_RATE, REPAIR_COST_MAX_RATE)
+    # Higher-level setups have more equipment on the line, so repairs
+    # scale up a bit with level too.
+    scaled_price = base_price * (1 + 0.1 * (level - 1))
+    return max(50, round(scaled_price * rate))
 
 
 def get_status(user_id: str):
@@ -310,9 +382,13 @@ class Business(commands.Cog):
                 level,
                 last_collected,
                 lifetime_earnings,
-                purchased_at
+                purchased_at,
+                broken,
+                repair_cost,
+                repair_reason,
+                broken_since
             )
-            VALUES (?, ?, 1, ?, 0, ?)
+            VALUES (?, ?, 1, ?, 0, ?, 0, 0, NULL, NULL)
             """,
             (
                 user_id,
@@ -379,6 +455,11 @@ class Business(commands.Cog):
             info["price"] * SELL_RETURN_RATE * owned["level"]
         )
 
+        # Unpaid repairs get deducted from the resale value — nobody
+        # wants to buy a broken-down business at full price.
+        if owned["broken"]:
+            refund = max(0, refund - owned["repair_cost"])
+
         conn.execute(
             "DELETE FROM owned_businesses WHERE id = ?",
             (owned["id"],),
@@ -398,6 +479,12 @@ class Business(commands.Cog):
             ),
             color=WHITE,
         )
+
+        if owned["broken"]:
+            embed.description += (
+                f"\n(Nabawasan ang halaga dahil may hindi pa "
+                f"nababayarang repair na **{db.format_peso(owned['repair_cost'])}**.)"
+            )
 
         embed.set_footer(
             text=f"Balance: {db.format_peso(new_balance)}"
@@ -446,14 +533,20 @@ class Business(commands.Cog):
             if info is None:
                 continue
 
-            elapsed = now - row["last_collected"]
-            ready = elapsed >= COLLECT_INTERVAL_SECONDS
+            if row["broken"]:
+                status = (
+                    f"🛠️ needs repair — "
+                    f"**{db.format_peso(row['repair_cost'])}**"
+                )
+            else:
+                elapsed = now - row["last_collected"]
+                ready = elapsed >= COLLECT_INTERVAL_SECONDS
 
-            status = (
-                "ready to collect"
-                if ready
-                else f"ready <t:{row['last_collected'] + COLLECT_INTERVAL_SECONDS}:R>"
-            )
+                status = (
+                    "ready to collect"
+                    if ready
+                    else f"ready <t:{row['last_collected'] + COLLECT_INTERVAL_SECONDS}:R>"
+                )
 
             total_lifetime += row["lifetime_earnings"]
 
@@ -526,11 +619,20 @@ class Business(commands.Cog):
 
         total_collected = 0
         lines = []
+        newly_broken = []
 
         for row in rows:
             info = BUSINESSES.get(row["business_key"])
 
             if info is None:
+                continue
+
+            if row["broken"]:
+                lines.append(
+                    f"{business_label(row['business_key'])} — 🛠️ "
+                    f"needs repair (**{db.format_peso(row['repair_cost'])}**) "
+                    f"before it can earn again"
+                )
                 continue
 
             elapsed = now - row["last_collected"]
@@ -546,20 +648,50 @@ class Business(commands.Cog):
             income = income_for_level(info["income"], row["level"])
             total_collected += income
 
-            conn.execute(
-                """
-                UPDATE owned_businesses
-                SET last_collected = ?,
-                    lifetime_earnings = lifetime_earnings + ?
-                WHERE id = ?
-                """,
-                (now, income, row["id"]),
-            )
+            # Roll for a random maintenance breakdown after collecting.
+            breaks_down = random.random() < maintenance_chance(row["level"])
 
-            lines.append(
-                f"{business_label(row['business_key'])} — "
-                f"**{db.format_peso(income)}**"
-            )
+            if breaks_down:
+                repair_cost = roll_repair_cost(info["price"], row["level"])
+                reason = random.choice(MAINTENANCE_ISSUES)
+
+                conn.execute(
+                    """
+                    UPDATE owned_businesses
+                    SET last_collected = ?,
+                        lifetime_earnings = lifetime_earnings + ?,
+                        broken = 1,
+                        repair_cost = ?,
+                        repair_reason = ?,
+                        broken_since = ?
+                    WHERE id = ?
+                    """,
+                    (now, income, repair_cost, reason, now, row["id"]),
+                )
+
+                lines.append(
+                    f"{business_label(row['business_key'])} — "
+                    f"**{db.format_peso(income)}**\n"
+                    f"⚠️ {reason}! Kailangan ng **{db.format_peso(repair_cost)}** "
+                    f"na repair — `/business repair` para ayusin."
+                )
+
+                newly_broken.append(row["business_key"])
+            else:
+                conn.execute(
+                    """
+                    UPDATE owned_businesses
+                    SET last_collected = ?,
+                        lifetime_earnings = lifetime_earnings + ?
+                    WHERE id = ?
+                    """,
+                    (now, income, row["id"]),
+                )
+
+                lines.append(
+                    f"{business_label(row['business_key'])} — "
+                    f"**{db.format_peso(income)}**"
+                )
 
         conn.commit()
         conn.close()
@@ -580,6 +712,134 @@ class Business(commands.Cog):
                 f"Total: {db.format_peso(total_collected)} | "
                 f"Balance: {db.format_peso(new_balance)}"
             )
+        )
+
+        await interaction.response.send_message(embed=embed)
+
+    # ------------------------------------------------------- /business repair
+
+    @business_group.command(
+        name="repair",
+        description="Pay for maintenance on a broken-down business.",
+    )
+    @app_commands.describe(
+        business="Leave empty to see which businesses need repair"
+    )
+    @app_commands.choices(business=BUSINESS_CHOICES)
+    async def business_repair(
+        self,
+        interaction: discord.Interaction,
+        business: app_commands.Choice[str] = None,
+    ):
+        user_id = str(interaction.user.id)
+
+        conn = get_conn()
+
+        if business is None:
+            broken_rows = conn.execute(
+                """
+                SELECT * FROM owned_businesses
+                WHERE user_id = ? AND broken = 1
+                """,
+                (user_id,),
+            ).fetchall()
+
+            conn.close()
+
+            if not broken_rows:
+                await interaction.response.send_message(
+                    "Ayos naman lahat ng negosyo mo — walang "
+                    "kailangang ayusin. ✅"
+                )
+                return
+
+            lines = [
+                f"{business_label(r['business_key'])} — "
+                f"**{db.format_peso(r['repair_cost'])}** ({r['repair_reason']})"
+                for r in broken_rows
+            ]
+
+            embed = discord.Embed(
+                title="🛠️ Businesses Needing Repair",
+                description="\n".join(lines),
+                color=WHITE,
+            )
+
+            embed.set_footer(
+                text="/business repair <business> para magbayad."
+            )
+
+            await interaction.response.send_message(embed=embed)
+            return
+
+        key = business.value
+
+        owned = conn.execute(
+            """
+            SELECT * FROM owned_businesses
+            WHERE user_id = ? AND business_key = ?
+            """,
+            (user_id, key),
+        ).fetchone()
+
+        if owned is None:
+            conn.close()
+
+            await interaction.response.send_message(
+                f"Wala kang {business_label(key)}."
+            )
+            return
+
+        if not owned["broken"]:
+            conn.close()
+
+            await interaction.response.send_message(
+                f"Maayos naman ang {business_label(key)}. "
+                f"Wala itong kailangang ayusin."
+            )
+            return
+
+        user = db.get_user(user_id)
+
+        if user["balance"] < owned["repair_cost"]:
+            conn.close()
+
+            await interaction.response.send_message(
+                f"Kulang ang pera mo. Kailangan mo ng "
+                f"**{db.format_peso(owned['repair_cost'])}** para maayos "
+                f"ang {business_label(key)} ({owned['repair_reason']})."
+            )
+            return
+
+        new_balance = db.add_balance(user_id, -owned["repair_cost"])
+
+        conn.execute(
+            """
+            UPDATE owned_businesses
+            SET broken = 0,
+                repair_cost = 0,
+                repair_reason = NULL,
+                broken_since = NULL
+            WHERE id = ?
+            """,
+            (owned["id"],),
+        )
+
+        conn.commit()
+        conn.close()
+
+        embed = discord.Embed(
+            title="Business Repaired",
+            description=(
+                f"Naayos mo na ang {business_label(key)} para sa "
+                f"**{db.format_peso(owned['repair_cost'])}**.\n"
+                f"Puwede ka nang mag-collect ulit dito."
+            ),
+            color=WHITE,
+        )
+
+        embed.set_footer(
+            text=f"Balance: {db.format_peso(new_balance)}"
         )
 
         await interaction.response.send_message(embed=embed)
@@ -616,6 +876,15 @@ class Business(commands.Cog):
 
             await interaction.response.send_message(
                 f"Wala kang {business_label(key)}."
+            )
+            return
+
+        if owned["broken"]:
+            conn.close()
+
+            await interaction.response.send_message(
+                f"Ayusin mo muna ang {business_label(key)} "
+                f"(`/business repair`) bago mag-upgrade."
             )
             return
 
@@ -715,15 +984,23 @@ class Business(commands.Cog):
             )
         )
 
+        description = (
+            f"Level: **{owned['level']}** / {UPGRADE_MAX_LEVEL}\n"
+            f"Income per collect: **{db.format_peso(current_income)}**\n"
+            f"Lifetime earnings: **{db.format_peso(owned['lifetime_earnings'])}**\n"
+            f"Next upgrade cost: **{next_upgrade}**\n"
+            f"Purchased: <t:{owned['purchased_at']}:D>"
+        )
+
+        if owned["broken"]:
+            description += (
+                f"\n\n🛠️ **Needs repair**: {owned['repair_reason']}\n"
+                f"Repair cost: **{db.format_peso(owned['repair_cost'])}**"
+            )
+
         embed = discord.Embed(
             title=f"{business_label(key)} Stats",
-            description=(
-                f"Level: **{owned['level']}** / {UPGRADE_MAX_LEVEL}\n"
-                f"Income per collect: **{db.format_peso(current_income)}**\n"
-                f"Lifetime earnings: **{db.format_peso(owned['lifetime_earnings'])}**\n"
-                f"Next upgrade cost: **{next_upgrade}**\n"
-                f"Purchased: <t:{owned['purchased_at']}:D>"
-            ),
+            description=description,
             color=WHITE,
         )
 
