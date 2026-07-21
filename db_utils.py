@@ -55,11 +55,7 @@ def get_user(user_id: str) -> dict:
     return dict(row)
 
 
-def set_balance(
-    user_id: str,
-    amount,
-) -> int:
-
+def set_balance(user_id: str, amount) -> int:
     get_user(user_id)
 
     amount = max(
@@ -87,11 +83,7 @@ def set_balance(
     return amount
 
 
-def add_balance(
-    user_id: str,
-    delta,
-) -> int:
-
+def add_balance(user_id: str, delta) -> int:
     user = get_user(user_id)
 
     return set_balance(
@@ -100,11 +92,7 @@ def add_balance(
     )
 
 
-def set_job(
-    user_id: str,
-    job: str,
-) -> None:
-
+def set_job(user_id: str, job: str) -> None:
     get_user(user_id)
 
     conn = get_conn()
@@ -167,7 +155,9 @@ def check_cooldown(
             f"Unknown cooldown field: {field}"
         )
 
-    user = get_user(user_id)
+    user = get_user(
+        user_id
+    )
 
     last = user[field] or 0
 
@@ -220,7 +210,41 @@ def format_duration(seconds) -> str:
             f"{secs}s"
         )
 
-    return " ".join(parts) or "0s"
+    return (
+        " ".join(parts)
+        or "0s"
+    )
+
+
+def get_inventory(
+    user_id: str,
+    item: str,
+) -> dict:
+
+    conn = get_conn()
+
+    row = conn.execute(
+        """
+        SELECT *
+        FROM inventory
+        WHERE user_id = ?
+        AND item = ?
+        """,
+        (
+            user_id,
+            item,
+        ),
+    ).fetchone()
+
+    conn.close()
+
+    if row is None:
+        return {
+            "qty": 0,
+            "avg_buy_price": 0,
+        }
+
+    return dict(row)
 
 
 def get_inventory_qty(
@@ -228,57 +252,12 @@ def get_inventory_qty(
     item: str,
 ) -> int:
 
-    conn = get_conn()
-
-    row = conn.execute(
-        """
-        SELECT qty
-        FROM inventory
-        WHERE user_id = ?
-        AND item = ?
-        """,
-        (
-            user_id,
-            item,
-        ),
-    ).fetchone()
-
-    conn.close()
-
-    return (
-        row["qty"]
-        if row
-        else 0
+    inventory = get_inventory(
+        user_id,
+        item,
     )
 
-
-def get_avg_buy_price(
-    user_id: str,
-    item: str,
-) -> int:
-
-    conn = get_conn()
-
-    row = conn.execute(
-        """
-        SELECT avg_buy_price
-        FROM inventory
-        WHERE user_id = ?
-        AND item = ?
-        """,
-        (
-            user_id,
-            item,
-        ),
-    ).fetchone()
-
-    conn.close()
-
-    return (
-        row["avg_buy_price"]
-        if row
-        else 0
-    )
+    return inventory["qty"]
 
 
 def add_inventory(
@@ -288,34 +267,18 @@ def add_inventory(
     buy_price: int | None = None,
 ) -> int:
 
-    conn = get_conn()
-
-    row = conn.execute(
-        """
-        SELECT
-            qty,
-            avg_buy_price
-        FROM inventory
-        WHERE user_id = ?
-        AND item = ?
-        """,
-        (
-            user_id,
-            item,
-        ),
-    ).fetchone()
-
-    current_qty = (
-        row["qty"]
-        if row
-        else 0
+    inventory = get_inventory(
+        user_id,
+        item,
     )
 
-    current_avg = (
-        row["avg_buy_price"]
-        if row
-        else 0
-    )
+    current_qty = inventory[
+        "qty"
+    ]
+
+    current_avg = inventory[
+        "avg_buy_price"
+    ]
 
     new_qty = max(
         0,
@@ -327,12 +290,12 @@ def add_inventory(
     if (
         delta > 0
         and buy_price is not None
-        and new_qty > 0
     ):
         total_cost = (
-            current_qty * current_avg
-        ) + (
-            delta * buy_price
+            current_qty
+            * current_avg
+            + delta
+            * buy_price
         )
 
         new_avg = round(
@@ -341,6 +304,8 @@ def add_inventory(
 
     if new_qty == 0:
         new_avg = 0
+
+    conn = get_conn()
 
     conn.execute(
         """
@@ -352,7 +317,11 @@ def add_inventory(
         )
         VALUES (?, ?, ?, ?)
 
-        ON CONFLICT(user_id, item)
+        ON CONFLICT(
+            user_id,
+            item
+        )
+
         DO UPDATE SET
             qty = excluded.qty,
             avg_buy_price = excluded.avg_buy_price
