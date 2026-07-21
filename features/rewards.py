@@ -91,7 +91,7 @@ class Rewards(commands.Cog):
 
     @app_commands.command(
         name="daily",
-        description="Claim your daily allowance.",
+        description="Claim your daily reward.",
     )
     async def daily(
         self,
@@ -129,7 +129,7 @@ class Rewards(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Daily Allowance",
+            title="Daily reward",
             description=(
                 f"Nakakuha ka ng **{db.format_peso(amount)}** "
                 f"na baon para ngayong araw."
@@ -147,7 +147,7 @@ class Rewards(commands.Cog):
 
     @app_commands.command(
         name="weekly",
-        description="Claim your weekly pay.",
+        description="Claim your weekly reward.",
     )
     async def weekly(
         self,
@@ -185,7 +185,7 @@ class Rewards(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Weekly Sahod",
+            title="Weekly reward",
             description=(
                 f"Nakakuha ka ng **{db.format_peso(amount)}** "
                 f"na weekly sahod."
@@ -203,7 +203,7 @@ class Rewards(commands.Cog):
 
     @app_commands.command(
         name="monthly",
-        description="Claim your monthly salary.",
+        description="Claim your monthly reward.",
     )
     async def monthly(
         self,
@@ -241,7 +241,7 @@ class Rewards(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Monthly Sweldo",
+            title="Monthly reward",
             description=(
                 f"Nakakuha ka ng **{db.format_peso(amount)}** "
                 f"na buwanang sweldo."
@@ -259,7 +259,7 @@ class Rewards(commands.Cog):
 
     @app_commands.command(
         name="yearly",
-        description="Claim your yearly bonus.",
+        description="Claim your yearly reward.",
     )
     async def yearly(
         self,
@@ -297,7 +297,7 @@ class Rewards(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="🎉 Yearly Bonus",
+            title="🎉 Yearly reward",
             description=(
                 f"Nakakuha ka ng **{db.format_peso(amount)}** "
                 f"na taunang bonus (parang 13th month pay)!"
