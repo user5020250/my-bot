@@ -80,6 +80,11 @@ def init_db() -> None:
             tickets INTEGER NOT NULL DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS lottery_channels (
+            guild_id TEXT PRIMARY KEY,
+            channel_id TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS debts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             lender TEXT NOT NULL,
