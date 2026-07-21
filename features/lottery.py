@@ -40,26 +40,24 @@ def ensure_lottery_table():
     conn.close()
 
 
-class Lottery(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
+class CreateGroup(app_commands.Group):
+    def __init__(self, cog):
+        super().__init__(
+            name="create",
+            description="Create commands."
+        )
 
-        ensure_lottery_table()
+        self.cog = cog
 
-    lottery_group = app_commands.Group(
+    @app_commands.command(
         name="lottery",
-        description="Lottery commands."
-    )
-
-    @lottery_group.command(
-        name="create",
         description="Create a lottery."
     )
     @app_commands.describe(
         prize="Lottery prize",
         hours="How many hours before it ends"
     )
-    async def create_lottery(
+    async def lottery(
         self,
         interaction: discord.Interaction,
         prize: int,
@@ -115,21 +113,35 @@ class Lottery(commands.Cog):
 
         embed = discord.Embed(
             title="🎟️ Lottery Created",
-            color=WHITE,
             description=(
                 f"Lottery ID: `{lottery_id}`\n"
                 f"Prize: **{db.format_peso(prize)}**\n"
                 f"Ends: <t:{ends_at}:R>"
-            )
+            ),
+            color=WHITE,
         )
 
         await interaction.response.send_message(
             embed=embed
         )
 
+
+class Lottery(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+        ensure_lottery_table()
+
+        self.create_group = CreateGroup(self)
+
+    lottery_group = app_commands.Group(
+        name="lottery",
+        description="Lottery commands."
+    )
+
     @lottery_group.command(
         name="draw",
-        description="Draw the current lottery."
+        description="Draw the lottery."
     )
     async def draw_lottery(
         self,
@@ -220,7 +232,7 @@ class Lottery(commands.Cog):
 
         embed = discord.Embed(
             title="🎉 Lottery Winner",
-            color=WHITE,
+            color=WHITE
         )
 
         embed.add_field(
@@ -243,6 +255,10 @@ class Lottery(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(
-        Lottery(bot)
+    cog = Lottery(bot)
+
+    await bot.add_cog(cog)
+
+    bot.tree.add_command(
+        cog.create_group
     )
