@@ -27,7 +27,10 @@ _ALLOWED_COOLDOWN_FIELDS = {
 # USERS
 # ==========================================================
 
-def get_user(user_id: str) -> dict:
+def get_user(
+    user_id: str,
+) -> dict:
+
     conn = get_conn()
 
     row = conn.execute(
@@ -36,7 +39,9 @@ def get_user(user_id: str) -> dict:
         FROM users
         WHERE id = ?
         """,
-        (user_id,),
+        (
+            user_id,
+        ),
     ).fetchone()
 
     if row is None:
@@ -62,7 +67,9 @@ def get_user(user_id: str) -> dict:
             FROM users
             WHERE id = ?
             """,
-            (user_id,),
+            (
+                user_id,
+            ),
         ).fetchone()
 
     conn.close()
@@ -107,7 +114,9 @@ def add_balance(
     delta: int,
 ) -> int:
 
-    user = get_user(user_id)
+    user = get_user(
+        user_id,
+    )
 
     return set_balance(
         user_id,
@@ -186,14 +195,21 @@ def check_cooldown(
             f"Unknown cooldown field: {field}"
         )
 
-    user = get_user(user_id)
+    user = get_user(
+        user_id,
+    )
 
-    last = user[field] or 0
+    last_used = user.get(
+        field,
+        0,
+    ) or 0
 
-    now = int(time.time())
+    now = int(
+        time.time(),
+    )
 
     remaining = cooldown_seconds - (
-        now - last
+        now - last_used
     )
 
     return max(
@@ -230,6 +246,8 @@ def get_inventory(
 
     if row is None:
         return {
+            "user_id": user_id,
+            "item": item,
             "qty": 0,
             "avg_buy_price": 0,
         }
@@ -242,15 +260,17 @@ def get_inventory_qty(
     item: str,
 ) -> int:
 
-    return get_inventory(
+    inventory = get_inventory(
         user_id,
         item,
-    )["qty"]
+    )
+
+    return inventory["qty"]
 
 
 def get_all_inventory(
     user_id: str,
-) -> list:
+) -> list[dict]:
 
     conn = get_conn()
 
@@ -259,9 +279,12 @@ def get_all_inventory(
         SELECT *
         FROM inventory
         WHERE user_id = ?
-        ORDER BY item
+        AND qty > 0
+        ORDER BY qty DESC, item ASC
         """,
-        (user_id,),
+        (
+            user_id,
+        ),
     ).fetchall()
 
     conn.close()
@@ -270,6 +293,21 @@ def get_all_inventory(
         dict(row)
         for row in rows
     ]
+
+
+def has_item(
+    user_id: str,
+    item: str,
+    amount: int = 1,
+) -> bool:
+
+    return (
+        get_inventory_qty(
+            user_id,
+            item,
+        )
+        >= amount
+    )
 
 
 def add_inventory(
@@ -284,8 +322,13 @@ def add_inventory(
         item,
     )
 
-    current_qty = inventory["qty"]
-    current_avg = inventory["avg_buy_price"]
+    current_qty = inventory[
+        "qty"
+    ]
+
+    current_avg = inventory[
+        "avg_buy_price"
+    ]
 
     new_qty = max(
         0,
@@ -346,6 +389,29 @@ def add_inventory(
     return new_qty
 
 
+def remove_inventory(
+    user_id: str,
+    item: str,
+    amount: int = 1,
+) -> bool:
+
+    current_qty = get_inventory_qty(
+        user_id,
+        item,
+    )
+
+    if current_qty < amount:
+        return False
+
+    add_inventory(
+        user_id,
+        item,
+        -amount,
+    )
+
+    return True
+
+
 # ==========================================================
 # FORMATTING
 # ==========================================================
@@ -361,19 +427,21 @@ def format_duration(
     seconds: int,
 ) -> str:
 
-    seconds = int(seconds)
+    seconds = int(
+        seconds,
+    )
 
     days, seconds = divmod(
         seconds,
         86400,
     )
 
-    hrs, seconds = divmod(
+    hours, seconds = divmod(
         seconds,
         3600,
     )
 
-    mins, secs = divmod(
+    minutes, seconds = divmod(
         seconds,
         60,
     )
@@ -385,19 +453,26 @@ def format_duration(
             f"{days}d"
         )
 
-    if hrs:
+    if hours:
         parts.append(
-            f"{hrs}h"
+            f"{hours}h"
         )
 
-    if mins:
+    if minutes:
         parts.append(
-            f"{mins}m"
+            f"{minutes}m"
         )
 
-    if secs and days == 0 and hrs == 0:
+    if (
+        seconds
+        and days == 0
+        and hours == 0
+    ):
         parts.append(
-            f"{secs}s"
+            f"{seconds}s"
         )
 
-    return " ".join(parts) or "0s"
+    return (
+        " ".join(parts)
+        or "0s"
+    )
