@@ -1,10 +1,10 @@
 import random
+import time
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from database import get_conn
 import db_utils as db
 
 WHITE = discord.Color(0xFFFFFF)
@@ -32,11 +32,35 @@ class Lottery(commands.Cog):
     )
     @app_commands.describe(
         prize="Lottery prize (500k, 1m, 2b)",
+        duration="How long the lottery lasts",
+        unit="Seconds, minutes, hours, or days",
+    )
+    @app_commands.choices(
+        unit=[
+            app_commands.Choice(
+                name="Seconds",
+                value="seconds",
+            ),
+            app_commands.Choice(
+                name="Minutes",
+                value="minutes",
+            ),
+            app_commands.Choice(
+                name="Hours",
+                value="hours",
+            ),
+            app_commands.Choice(
+                name="Days",
+                value="days",
+            ),
+        ]
     )
     async def create_lottery(
         self,
         interaction: discord.Interaction,
         prize: str,
+        duration: int,
+        unit: app_commands.Choice[str],
     ):
         if interaction.user.id != OWNER_ID:
             await interaction.response.send_message(
@@ -56,6 +80,13 @@ class Lottery(commands.Cog):
             )
             return
 
+        if duration <= 0:
+            await interaction.response.send_message(
+                "❌ Duration must be greater than 0.",
+                ephemeral=True,
+            )
+            return
+
         current = db.get_lottery()
 
         if current is not None:
@@ -65,13 +96,28 @@ class Lottery(commands.Cog):
             )
             return
 
-        db.create_lottery(prize)
+        multipliers = {
+            "seconds": 1,
+            "minutes": 60,
+            "hours": 3600,
+            "days": 86400,
+        }
+
+        ends_at = int(time.time()) + (
+            duration * multipliers[unit.value]
+        )
+
+        db.create_lottery(
+            prize,
+            ends_at,
+        )
 
         embed = discord.Embed(
             title="🎟️ Lottery Created",
             description=(
-                f"Prize: **{db.format_peso(prize)}**\n\n"
-                f"Players can now join using lottery tickets."
+                f"Prize: **{db.format_peso(prize)}**\n"
+                f"Ends: <t:{ends_at}:R>\n\n"
+                f"Use lottery tickets to join."
             ),
             color=WHITE,
         )
@@ -100,6 +146,13 @@ class Lottery(commands.Cog):
         if lottery is None:
             await interaction.response.send_message(
                 "❌ No active lottery.",
+                ephemeral=True,
+            )
+            return
+
+        if lottery["ends_at"] > int(time.time()):
+            await interaction.response.send_message(
+                f"⏳ Lottery ends <t:{lottery['ends_at']}:R>.",
                 ephemeral=True,
             )
             return
