@@ -20,6 +20,7 @@ _ALLOWED_COOLDOWN_FIELDS = {
     "last_weekly",
     "last_monthly",
     "last_yearly",
+    "last_sideline",
 }
 
 # ==========================================================
