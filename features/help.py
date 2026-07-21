@@ -15,60 +15,60 @@ CATEGORIES = [
         "💰 Economy",
         [
             (
-                "/jobs",
+                "💼 /jobs",
                 "View all available jobs and see how much each one pays.",
             ),
             (
-                "/work: [job]",
-                "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 8 hours.",
+                "👔 /work: [job]",
+                "Choose or switch jobs. Run `/work` without selecting a job to work and get paid. Cooldown: 8 hours.",
             ),
             (
-                "/scatter: [₱]",
+                "🎰 /scatter: [₱]",
                 "Flip a coin and bet your money. Win big or lose everything. No cooldown.",
             ),
             (
-                "/karaoke",
+                "🎤 /karaoke",
                 "Sing for tips and earn ₱50–₱500. Cooldown: 5 minutes.",
             ),
             (
-                "/allowance",
+                "💵 /allowance",
                 "Claim your daily allowance of ₱50–₱100. Cooldown: 24 hours.",
             ),
             (
-                "/daily"
-                "Claim your daily reward."
+                "☀️ /daily",
+                "Claim your daily reward.",
             ),
             (
-                "/weekly"
-                "Claim your weekly reward."
+                "📅 /weekly",
+                "Claim your weekly reward.",
             ),
             (
-                "/yearly"
-                "Claim your yearly reward."
-            ),  
+                "🎉 /yearly",
+                "Claim your yearly reward.",
+            ),
         ],
     ),
     (
         "🏦 Loans",
         [
             (
-                "/utang request lender: [user] amount: [₱]",
+                "📨 /loan request lender: [user] amount: [₱]",
                 "Send a loan request to another player. They get 60 seconds to approve or decline. 20% interest, due in 7 days.",
             ),
             (
-                "/utang pay id: [id] amount: [₱]",
+                "💵 /loan pay id: [id] amount: [₱]",
                 "Pay off your active loans, oldest due date first.",
             ),
             (
-                "/utang list",
+                "📒 /loan list",
                 "See all loans you owe and all loans owed to you.",
             ),
             (
-                "/utang info loan_id: [id]",
+                "📄 /loan info loan_id: [id]",
                 "View details for a specific loan.",
             ),
             (
-                "/utang cancel request_id: [id]",
+                "❌ /loan cancel request_id: [id]",
                 "Cancel a loan request you sent before the lender responds.",
             ),
         ],
@@ -77,7 +77,7 @@ CATEGORIES = [
         "😈 Scamming",
         [
             (
-                "/budol target: [user]",
+                "🎭 /scam target: [user]",
                 "Try to scam another player. High risk, high reward. Cooldown: 1 day.",
             ),
         ],
@@ -86,47 +86,47 @@ CATEGORIES = [
         "💼 Businesses",
         [
             (
-                "/business list",
+                "📋 /business list",
                 "Show all available businesses and their prices.",
             ),
             (
-                "/business buy business: [business]",
+                "🛒 /business buy business: [business]",
                 "Buy a business.",
             ),
             (
-                "/business sell business: [business]",
+                "💰 /business sell business: [business]",
                 "Sell a business back to the bot.",
             ),
             (
-                "/business portfolio",
+                "📊 /business portfolio",
                 "Show all businesses you own.",
             ),
             (
-                "/business collect business: [business]",
+                "💵 /business collect business: [business]",
                 "Collect income from one business, or leave it blank to collect from all of them.",
             ),
             (
-                "/business upgrade business: [business]",
+                "⬆️ /business upgrade business: [business]",
                 "Upgrade a business to increase its income.",
             ),
             (
-                "/business stats business: [business]",
+                "📈 /business stats business: [business]",
                 "Show lifetime earnings, level, and next upgrade cost for a business.",
             ),
             (
-                "/business leaderboard",
+                "🏆 /business leaderboard",
                 "Show the richest business owners.",
             ),
             (
-                "/business raid target: [user]",
+                "🏴‍☠️ /business raid target: [user]",
                 "Attempt to steal from another player's business.",
             ),
             (
-                "/business defend",
+                "🛡️ /business defend",
                 "Hire security for temporary protection against raids.",
             ),
             (
-                "/business bankrupt business: [business]",
+                "💥 /business bankrupt business: [business]",
                 "Close a business permanently. No refund.",
             ),
         ],
@@ -135,7 +135,7 @@ CATEGORIES = [
         "ℹ️ Info",
         [
             (
-                "/profile user: [user]",
+                "👤 /profile user: [user]",
                 "View your profile or another player's balance, job, and cooldowns.",
             ),
         ],
@@ -170,7 +170,7 @@ class HelpView(discord.ui.View):
         page = PAGES[self.index]
 
         embed = discord.Embed(
-            title=f"Commands — {page['category']}",
+            title=f"📖 Commands — {page['category']}",
             description=INTRO if self.index == 0 else None,
             color=WHITE,
         )
@@ -183,7 +183,7 @@ class HelpView(discord.ui.View):
             )
 
         embed.set_footer(
-            text=f"Page {self.index + 1}/{len(PAGES)} • unavailable economy bot"
+            text=f"📄 Page {self.index + 1}/{len(PAGES)} • unavailable economy bot"
         )
 
         return embed
@@ -194,7 +194,7 @@ class HelpView(discord.ui.View):
     ) -> bool:
         if interaction.user.id != self.author_id:
             await interaction.response.send_message(
-                "This menu belongs to someone else. Run `/help` to open your own.",
+                "🚫 This menu belongs to someone else. Run `/help` to open your own.",
                 ephemeral=True,
             )
             return False
@@ -239,7 +239,7 @@ class HelpView(discord.ui.View):
         self.stop()
 
         await interaction.response.edit_message(
-            content="Help menu closed. Run `/help` to open it again.",
+            content="👋 Help menu closed. Run `/help` to open it again.",
             embed=None,
             view=None,
         )
