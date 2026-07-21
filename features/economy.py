@@ -47,11 +47,9 @@ class Economy(commands.Cog):
                 inline=False,
             )
 
-        await interaction.response.send_message(
-            embed=embed
-        )
+        await interaction.response.send_message(embed=embed)
 
-    # ----------------------------------------------------------------- /work
+    # ---------------------------------------------------------------- /work
 
     @app_commands.command(
         name="work",
@@ -68,13 +66,9 @@ class Economy(commands.Cog):
         interaction: discord.Interaction,
         job: app_commands.Choice[str] = None,
     ):
-        user_id = str(
-            interaction.user.id
-        )
+        user_id = str(interaction.user.id)
 
-        user = db.get_user(
-            user_id
-        )
+        user = db.get_user(user_id)
 
         if job is not None:
             db.set_job(
@@ -82,23 +76,17 @@ class Economy(commands.Cog):
                 job.value,
             )
 
-            info = JOBS[
-                job.value
-            ]
+            info = JOBS[job.value]
 
             await interaction.response.send_message(
-                f"You are now a "
-                f"**{info['label']}**.\n"
+                f"You are now a **{info['label']}**.\n"
                 f"Use `/work` to work."
             )
             return
 
         current_job = user["job"]
 
-        if (
-            not current_job
-            or current_job not in JOBS
-        ):
+        if not current_job or current_job not in JOBS:
             await interaction.response.send_message(
                 "You don't have a job.\n"
                 "Use `/work job:[job]`."
@@ -113,14 +101,11 @@ class Economy(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"Try again in "
-                f"**{db.format_duration(remaining)}**."
+                f"Try again in **{db.format_duration(remaining)}**."
             )
             return
 
-        info = JOBS[
-            current_job
-        ]
+        info = JOBS[current_job]
 
         earnings = random.randint(
             info["min"],
@@ -141,26 +126,17 @@ class Economy(commands.Cog):
         embed = discord.Embed(
             title="Shift Complete",
             description=(
-                f"You worked as a "
-                f"**{info['label']}**.\n\n"
-                f"Earned "
-                f"**{db.format_peso(earnings)}**."
+                f"You worked as a **{info['label']}**.\n\n"
+                f"Earned **{db.format_peso(earnings)}**."
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=(
-                f"Balance: "
-                f"{db.format_peso(new_balance)}"
-            )
+            text=f"Balance: {db.format_peso(new_balance)}"
         )
 
-        await interaction.response.send_message(
-            embed=embed
-        )
-
-class Economy(commands.Cog):
+        await interaction.response.send_message(embed=embed)
 
     # -------------------------------------------------------------- /scatter
 
@@ -207,7 +183,10 @@ class Economy(commands.Cog):
         win = random.random() < 0.5
 
         if win:
-            new_balance = db.add_balance(user_id, amount)
+            new_balance = db.add_balance(
+                user_id,
+                amount,
+            )
 
             embed = discord.Embed(
                 title="🎉 You Won",
@@ -216,7 +195,10 @@ class Economy(commands.Cog):
             )
 
         else:
-            new_balance = db.add_balance(user_id, -amount)
+            new_balance = db.add_balance(
+                user_id,
+                -amount,
+            )
 
             embed = discord.Embed(
                 title="💀 You Lost",
@@ -228,9 +210,8 @@ class Economy(commands.Cog):
             text=f"Balance: {db.format_peso(new_balance)}"
         )
 
-        await interaction.response.send_message(
-            embed=embed
-        )
+        await interaction.response.send_message(embed=embed)
+
     # ------------------------------------------------------------- /allowance
 
     @app_commands.command(
@@ -241,9 +222,7 @@ class Economy(commands.Cog):
         self,
         interaction: discord.Interaction,
     ):
-        user_id = str(
-            interaction.user.id
-        )
+        user_id = str(interaction.user.id)
 
         remaining = db.check_cooldown(
             user_id,
@@ -253,8 +232,7 @@ class Economy(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"Come back in "
-                f"**{db.format_duration(remaining)}**."
+                f"Come back in **{db.format_duration(remaining)}**."
             )
             return
 
@@ -277,25 +255,17 @@ class Economy(commands.Cog):
         embed = discord.Embed(
             title="Allowance Claimed",
             description=(
-                f"You received "
-                f"**{db.format_peso(amount)}**."
+                f"You received **{db.format_peso(amount)}**."
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=(
-                f"Balance: "
-                f"{db.format_peso(new_balance)}"
-            )
+            text=f"Balance: {db.format_peso(new_balance)}"
         )
 
-        await interaction.response.send_message(
-            embed=embed
-        )
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(
-        Economy(bot)
-    )
+    await bot.add_cog(Economy(bot))
