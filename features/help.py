@@ -49,7 +49,7 @@ CATEGORIES = [
                 "Send a loan request to another player. They get 60 seconds to approve or decline. 20% interest, due in 7 days.",
             ),
             (
-                "/utang pay amount: [₱]",
+                "/utang pay id: [id] amount: [₱]",
                 "Pay off your active loans, oldest due date first.",
             ),
             (
