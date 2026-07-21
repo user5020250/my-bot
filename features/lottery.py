@@ -21,11 +21,6 @@ class Lottery(commands.Cog):
         description="Lottery commands.",
     )
 
-    create_group = app_commands.Group(
-        name="create",
-        description="Create commands.",
-    )
-
     @lottery_group.command(
         name="setchannel",
         description="Set the lottery announcement channel.",
@@ -47,47 +42,17 @@ class Lottery(commands.Cog):
             f"✅ Lottery announcements will be sent to {channel.mention}."
         )
 
-    @create_group.command(
-        name="lottery",
-        description="Create a lottery.",
-    )
-    @app_commands.describe(
-        prize="Lottery prize (500k, 1m, 2b)",
-        duration="How long the lottery lasts",
-        unit="Seconds, minutes, hours, or days",
-    )
-    @app_commands.choices(
-        unit=[
-            app_commands.Choice(
-                name="Seconds",
-                value="seconds",
-            ),
-            app_commands.Choice(
-                name="Minutes",
-                value="minutes",
-            ),
-            app_commands.Choice(
-                name="Hours",
-                value="hours",
-            ),
-            app_commands.Choice(
-                name="Days",
-                value="days",
-            ),
-        ]
+    @commands.command(
+        name="createlottery",
     )
     async def create_lottery(
         self,
-        interaction: discord.Interaction,
+        ctx: commands.Context,
         prize: str,
         duration: int,
-        unit: app_commands.Choice[str],
+        unit: str,
     ):
-        if interaction.user.id != OWNER_ID:
-            await interaction.response.send_message(
-                "❌ Owner only.",
-                ephemeral=True,
-            )
+        if ctx.author.id != OWNER_ID:
             return
 
         try:
@@ -96,36 +61,46 @@ class Lottery(commands.Cog):
             )
 
         except ValueError:
-            await interaction.response.send_message(
+            await ctx.send(
                 "❌ Invalid amount.\n"
-                "Examples: `500k`, `2m`, `1b`.",
-                ephemeral=True,
+                "Examples: `500k`, `2m`, `1b`."
             )
             return
 
         if duration <= 0:
-            await interaction.response.send_message(
-                "❌ Duration must be greater than 0.",
-                ephemeral=True,
+            await ctx.send(
+                "❌ Duration must be greater than 0."
             )
             return
 
         if db.get_lottery() is not None:
-            await interaction.response.send_message(
-                "❌ There is already an active lottery.",
-                ephemeral=True,
+            await ctx.send(
+                "❌ There is already an active lottery."
             )
             return
 
         multipliers = {
+            "second": 1,
             "seconds": 1,
+            "minute": 60,
             "minutes": 60,
+            "hour": 3600,
             "hours": 3600,
+            "day": 86400,
             "days": 86400,
         }
 
+        unit = unit.lower()
+
+        if unit not in multipliers:
+            await ctx.send(
+                "❌ Invalid time unit.\n"
+                "Use: seconds, minutes, hours, or days."
+            )
+            return
+
         ends_at = int(time.time()) + (
-            duration * multipliers[unit.value]
+            duration * multipliers[unit]
         )
 
         db.create_lottery(
@@ -160,13 +135,14 @@ class Lottery(commands.Cog):
                 await channel.send(
                     embed=embed
                 )
+
             except (
                 discord.Forbidden,
                 discord.HTTPException,
             ):
                 pass
 
-        await interaction.response.send_message(
+        await ctx.send(
             "✅ Lottery created."
         )
 
@@ -252,27 +228,21 @@ class Lottery(commands.Cog):
             f"🎟️ You joined with **{tickets}** ticket(s)."
         )
 
-    @lottery_group.command(
-        name="draw",
-        description="Draw the lottery immediately.",
+    @commands.command(
+        name="drawlottery",
     )
     async def draw_lottery(
         self,
-        interaction: discord.Interaction,
+        ctx: commands.Context,
     ):
-        if interaction.user.id != OWNER_ID:
-            await interaction.response.send_message(
-                "❌ Owner only.",
-                ephemeral=True,
-            )
+        if ctx.author.id != OWNER_ID:
             return
 
         lottery = db.get_lottery()
 
         if lottery is None:
-            await interaction.response.send_message(
-                "❌ No active lottery.",
-                ephemeral=True,
+            await ctx.send(
+                "❌ No active lottery."
             )
             return
 
@@ -281,7 +251,7 @@ class Lottery(commands.Cog):
         if not entries:
             db.end_lottery()
 
-            await interaction.response.send_message(
+            await ctx.send(
                 "❌ Nobody joined the lottery."
             )
             return
@@ -341,13 +311,14 @@ class Lottery(commands.Cog):
                 await channel.send(
                     embed=embed
                 )
+
             except (
                 discord.Forbidden,
                 discord.HTTPException,
             ):
                 pass
 
-        await interaction.response.send_message(
+        await ctx.send(
             embed=embed
         )
 
@@ -361,14 +332,8 @@ async def setup(bot):
 
     try:
         bot.tree.add_command(
-            cog.create_group
-        )
-    except app_commands.CommandAlreadyRegistered:
-        pass
-
-    try:
-        bot.tree.add_command(
             cog.lottery_group
         )
+
     except app_commands.CommandAlreadyRegistered:
         pass
