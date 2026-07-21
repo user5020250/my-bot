@@ -3,9 +3,15 @@ from discord import app_commands
 from discord.ext import commands
 
 import db_utils as db
-from database import get_conn
 
 WHITE = discord.Color(0xFFFFFF)
+
+ITEMS = {
+    "padlock": {
+        "emoji": "🔒",
+        "name": "Padlock",
+    },
+}
 
 
 class Inventory(commands.Cog):
@@ -14,7 +20,7 @@ class Inventory(commands.Cog):
 
     @app_commands.command(
         name="inventory",
-        description="View everything you own."
+        description="View everything you own.",
     )
     async def inventory(
         self,
@@ -22,21 +28,10 @@ class Inventory(commands.Cog):
     ):
         user_id = str(interaction.user.id)
 
-        conn = get_conn()
-
-        items = conn.execute(
-            """
-            SELECT item, qty
-            FROM inventory
-            WHERE user_id = ?
-            """,
-            (user_id,)
-        ).fetchall()
-
-        conn.close()
+        items = db.get_all_inventory(user_id)
 
         embed = discord.Embed(
-            title=f"{interaction.user.display_name}'s Inventory",
+            title=f"🎒 {interaction.user.display_name}'s Inventory",
             color=WHITE,
         )
 
@@ -44,12 +39,26 @@ class Inventory(commands.Cog):
             embed.description = "You don't own anything yet."
 
         else:
-            for item in items:
-                embed.add_field(
-                    name=item["item"].title(),
-                    value=f"x{item['qty']}",
-                    inline=False,
+            lines = []
+
+            for row in items:
+                item_id = row["item"]
+
+                item_data = ITEMS.get(
+                    item_id,
+                    {
+                        "emoji": "📦",
+                        "name": item_id.title(),
+                    },
                 )
+
+                lines.append(
+                    f"{item_data['emoji']} "
+                    f"**{item_data['name']}** "
+                    f"×{row['qty']}"
+                )
+
+            embed.description = "\n".join(lines)
 
         await interaction.response.send_message(
             embed=embed
@@ -57,4 +66,6 @@ class Inventory(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(Inventory(bot))
+    await bot.add_cog(
+        Inventory(bot)
+    )
