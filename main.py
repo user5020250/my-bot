@@ -24,6 +24,7 @@ COGS = [
     "cogs.social",    # NEW: /utang /bayad /budol /karaoke
     "cogs.admin",     # NEW: /give
     "cogs.help",      # NEW: /help command
+    "cogs.inventory",
 ]
 
 
