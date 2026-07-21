@@ -256,9 +256,10 @@ class Market(commands.Cog):
         )
 
         db.add_inventory(
-            user_id,
-            item.value,
-            quantity,
+            user_id=user_id,
+            item=item.value,
+            delta=quantity,
+            buy_price=row["buy_price"],
         )
 
         embed = discord.Embed(
@@ -397,9 +398,10 @@ class Market(commands.Cog):
         )
 
         db.add_inventory(
-            user_id,
-            "load",
-            quantity,
+            user_id=user_id,
+            item="load",
+            delta=quantity,
+            buy_price=LOAD_BUY_PRICE,
         )
 
         embed = discord.Embed(
