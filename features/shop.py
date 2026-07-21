@@ -4,8 +4,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from database import get_conn
 import db_utils as db
+from database import get_conn
 
 WHITE = discord.Color(0xFFFFFF)
 
@@ -42,33 +42,8 @@ def get_protected_until(user_id: str) -> int:
     return row["protected_until"] if row else 0
 
 
-def set_protected_until(user_id: str, until_ts: int) -> None:
-    conn = get_conn()
-
-    conn.execute(
-        """
-        INSERT INTO business_status (
-            user_id,
-            protected_until
-        )
-        VALUES (?, ?)
-
-        ON CONFLICT(user_id)
-        DO UPDATE SET
-            protected_until = excluded.protected_until
-        """,
-        (
-            user_id,
-            until_ts,
-        ),
-    )
-
-    conn.commit()
-    conn.close()
-
-
-class Economy(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+class Shop(commands.Cog):
+    def __init__(self, bot):
         self.bot = bot
 
     # ---------------------------------------------------------------
@@ -80,7 +55,7 @@ class Economy(commands.Cog):
         description="Check your balance.",
     )
     @app_commands.describe(
-        member="Whose balance to check",
+        member="Whose balance to check"
     )
     async def balance(
         self,
@@ -118,7 +93,9 @@ class Economy(commands.Cog):
             embed.add_field(
                 name="🔒 Protection",
                 value=(
-                    f"{db.format_duration(protected_until - now)} remaining"
+                    db.format_duration(
+                        protected_until - now
+                    )
                 ),
                 inline=False,
             )
@@ -145,20 +122,21 @@ class Economy(commands.Cog):
     ):
         embed = discord.Embed(
             title="🛒 Shop",
-            description="Use `/buy <item>`.",
+            description="Use `/buy <item>` to purchase items.",
             color=WHITE,
         )
 
-        for key, item in SHOP_ITEMS.items():
+        for item_id, item in SHOP_ITEMS.items():
             embed.add_field(
                 name=(
                     f"{item['emoji']} "
-                    f"{item['name']} — "
+                    f"{item['name']} "
+                    f"— "
                     f"{db.format_peso(item['cost'])}"
                 ),
                 value=(
                     f"{item['description']}\n"
-                    f"ID: `{key}`"
+                    f"ID: `{item_id}`"
                 ),
                 inline=False,
             )
@@ -176,7 +154,7 @@ class Economy(commands.Cog):
         description="Buy an item.",
     )
     @app_commands.describe(
-        item="Item ID",
+        item="Item ID"
     )
     async def buy(
         self,
@@ -187,7 +165,10 @@ class Economy(commands.Cog):
 
         if item not in SHOP_ITEMS:
             await interaction.response.send_message(
-                f"❌ `{item}` is not a valid item.",
+                (
+                    f"❌ `{item}` doesn't exist.\n"
+                    "Use `/shop`."
+                ),
                 ephemeral=True,
             )
             return
@@ -204,10 +185,11 @@ class Economy(commands.Cog):
 
         if user["balance"] < shop_item["cost"]:
             await interaction.response.send_message(
-                f"❌ You need "
-                f"{db.format_peso(shop_item['cost'])} "
-                f"but only have "
-                f"{db.format_peso(user['balance'])}.",
+                (
+                    "❌ You don't have enough money.\n\n"
+                    f"Needed: {db.format_peso(shop_item['cost'])}\n"
+                    f"Balance: {db.format_peso(user['balance'])}"
+                ),
                 ephemeral=True,
             )
             return
@@ -221,99 +203,22 @@ class Economy(commands.Cog):
             user_id,
             item,
             1,
-            shop_item["cost"],
-        )
-
-        new_qty = db.get_inventory_qty(
-            user_id,
-            item,
+            buy_price=shop_item["cost"],
         )
 
         await interaction.response.send_message(
-            f"✅ Bought "
-            f"{shop_item['emoji']} "
-            f"**{shop_item['name']}**.\n\n"
-            f"📦 Inventory: **{new_qty}**\n"
-            f"💰 Balance: "
-            f"**{db.format_peso(new_balance)}**"
-        )
-
-    # ---------------------------------------------------------------
-    # /use
-    # ---------------------------------------------------------------
-
-    @app_commands.command(
-        name="use",
-        description="Use an item from your inventory.",
-    )
-    @app_commands.describe(
-        item="The item to use",
-    )
-    async def use(
-        self,
-        interaction: discord.Interaction,
-        item: str,
-    ):
-        item = item.lower()
-
-        user_id = str(
-            interaction.user.id
-        )
-
-        qty = db.get_inventory_qty(
-            user_id,
-            item,
-        )
-
-        if qty <= 0:
-            await interaction.response.send_message(
-                "❌ You don't own that item.",
-                ephemeral=True,
+            (
+                f"✅ Bought "
+                f"{shop_item['emoji']} "
+                f"**{shop_item['name']}**.\n\n"
+                f"New balance: "
+                f"**{db.format_peso(new_balance)}**.\n\n"
+                f"Use `/inventory` to see it."
             )
-            return
-
-        if item == "padlock":
-            now = int(
-                time.time()
-            )
-
-            current = get_protected_until(
-                user_id
-            )
-
-            start = (
-                current
-                if current > now
-                else now
-            )
-
-            set_protected_until(
-                user_id,
-                start + PADLOCK_DURATION_SECONDS,
-            )
-
-            remaining = db.add_inventory(
-                user_id,
-                "padlock",
-                -1,
-            )
-
-            await interaction.response.send_message(
-                f"🔒 Padlock activated.\n\n"
-                f"Protection expires "
-                f"<t:{start + PADLOCK_DURATION_SECONDS}:R>\n"
-                f"📦 Remaining: **{remaining}**"
-            )
-
-            return
-
-        await interaction.response.send_message(
-            "❌ That item can't be used.",
-            ephemeral=True,
         )
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(
-        Economy(bot)
+        Shop(bot)
     )
