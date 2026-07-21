@@ -41,6 +41,12 @@ def create_lottery(
 
     conn.execute(
         """
+        DELETE FROM lottery_entries
+        """
+    )
+
+    conn.execute(
+        """
         INSERT INTO lottery (
             id,
             prize,
@@ -72,7 +78,8 @@ def get_lottery() -> dict | None:
         """
         SELECT *
         FROM lottery
-        WHERE id = 1
+        WHERE active = 1
+        LIMIT 1
         """
     ).fetchone()
 
@@ -90,7 +97,9 @@ def end_lottery() -> None:
 
     conn.execute(
         """
-        DELETE FROM lottery
+        UPDATE lottery
+        SET active = 0
+        WHERE id = 1
         """
     )
 
