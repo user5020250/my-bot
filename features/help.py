@@ -20,7 +20,7 @@ CATEGORIES = [
             ),
             (
                 "/trabaho job: [job]",
-                "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 24 hours.",
+                "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 10 mins.",
             ),
             (
                 "/tambay",
