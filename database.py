@@ -75,14 +75,6 @@ def init_db() -> None:
             active INTEGER NOT NULL DEFAULT 1
         );
 
-        CREATE TABLE IF NOT EXISTS lotteries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            prize INTEGER NOT NULL,
-            ends_at INTEGER NOT NULL,
-            created_by TEXT NOT NULL,
-            active INTEGER NOT NULL DEFAULT 1
-        );
-
         CREATE TABLE IF NOT EXISTS lottery_entries (
             user_id TEXT PRIMARY KEY,
             tickets INTEGER NOT NULL DEFAULT 0
@@ -114,11 +106,8 @@ def init_db() -> None:
             business_key TEXT NOT NULL,
 
             level INTEGER NOT NULL DEFAULT 1,
-
             last_collected INTEGER NOT NULL,
-
             lifetime_earnings INTEGER NOT NULL DEFAULT 0,
-
             purchased_at INTEGER NOT NULL,
 
             UNIQUE (
@@ -131,7 +120,6 @@ def init_db() -> None:
             user_id TEXT PRIMARY KEY,
 
             last_raid INTEGER NOT NULL DEFAULT 0,
-
             protected_until INTEGER NOT NULL DEFAULT 0
         );
         """
@@ -152,13 +140,6 @@ def init_db() -> None:
     }
 
     lottery_columns = {
-        row["name"]
-        for row in conn.execute(
-            "PRAGMA table_info(lotteries)"
-        ).fetchall()
-    }
-
-    old_lottery_columns = {
         row["name"]
         for row in conn.execute(
             "PRAGMA table_info(lottery)"
@@ -213,21 +194,19 @@ def init_db() -> None:
             """
         )
 
-    if "active" not in lottery_columns:
-        conn.execute(
-            """
-            ALTER TABLE lotteries
-            ADD COLUMN active INTEGER NOT NULL DEFAULT 1
-            """
-        )
-
-    if "ends_at" not in old_lottery_columns:
+    if "ends_at" not in lottery_columns:
         conn.execute(
             """
             ALTER TABLE lottery
             ADD COLUMN ends_at INTEGER NOT NULL DEFAULT 0
             """
         )
+
+    conn.execute(
+        """
+        DROP TABLE IF EXISTS lotteries
+        """
+    )
 
     conn.commit()
     conn.close()
