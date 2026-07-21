@@ -26,6 +26,27 @@ class Lottery(commands.Cog):
         description="Create commands.",
     )
 
+    @lottery_group.command(
+        name="setchannel",
+        description="Set the lottery announcement channel.",
+    )
+    @app_commands.checks.has_permissions(
+        administrator=True
+    )
+    async def setchannel(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+    ):
+        db.set_lottery_channel(
+            str(interaction.guild.id),
+            str(channel.id),
+        )
+
+        await interaction.response.send_message(
+            f"✅ Lottery announcements will be sent to {channel.mention}."
+        )
+
     @create_group.command(
         name="lottery",
         description="Create a lottery.",
@@ -70,7 +91,9 @@ class Lottery(commands.Cog):
             return
 
         try:
-            prize = db.parse_money(prize)
+            prize = db.parse_money(
+                prize
+            )
 
         except ValueError:
             await interaction.response.send_message(
@@ -87,9 +110,7 @@ class Lottery(commands.Cog):
             )
             return
 
-        current = db.get_lottery()
-
-        if current is not None:
+        if db.get_lottery() is not None:
             await interaction.response.send_message(
                 "❌ There is already an active lottery.",
                 ephemeral=True,
@@ -113,17 +134,40 @@ class Lottery(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="🎟️ Lottery Created",
+            title="🎟️ New Lottery",
             description=(
                 f"💰 Prize: **{db.format_peso(prize)}**\n"
                 f"⏳ Ends: <t:{ends_at}:R>\n\n"
-                f"Use lottery tickets to join."
+                f"Use `/lottery join` to enter."
             ),
             color=WHITE,
         )
 
+        channels = db.get_all_lottery_channels()
+
+        for data in channels:
+
+            channel = self.bot.get_channel(
+                int(
+                    data["channel_id"]
+                )
+            )
+
+            if channel is None:
+                continue
+
+            try:
+                await channel.send(
+                    embed=embed
+                )
+            except (
+                discord.Forbidden,
+                discord.HTTPException,
+            ):
+                pass
+
         await interaction.response.send_message(
-            embed=embed
+            "✅ Lottery created."
         )
 
     @lottery_group.command(
@@ -210,7 +254,7 @@ class Lottery(commands.Cog):
 
     @lottery_group.command(
         name="draw",
-        description="Draw the lottery.",
+        description="Draw the lottery immediately.",
     )
     async def draw_lottery(
         self,
@@ -232,13 +276,6 @@ class Lottery(commands.Cog):
             )
             return
 
-        if lottery["ends_at"] > int(time.time()):
-            await interaction.response.send_message(
-                f"⏳ Lottery ends <t:{lottery['ends_at']}:R>.",
-                ephemeral=True,
-            )
-            return
-
         entries = db.get_lottery_entries()
 
         if not entries:
@@ -253,10 +290,13 @@ class Lottery(commands.Cog):
 
         for entry in entries:
             pool.extend(
-                [entry["user_id"]] * entry["tickets"]
+                [entry["user_id"]]
+                * entry["tickets"]
             )
 
-        winner_id = random.choice(pool)
+        winner_id = random.choice(
+            pool
+        )
 
         db.add_balance(
             winner_id,
@@ -284,6 +324,29 @@ class Lottery(commands.Cog):
             inline=False,
         )
 
+        channels = db.get_all_lottery_channels()
+
+        for data in channels:
+
+            channel = self.bot.get_channel(
+                int(
+                    data["channel_id"]
+                )
+            )
+
+            if channel is None:
+                continue
+
+            try:
+                await channel.send(
+                    embed=embed
+                )
+            except (
+                discord.Forbidden,
+                discord.HTTPException,
+            ):
+                pass
+
         await interaction.response.send_message(
             embed=embed
         )
@@ -292,7 +355,9 @@ class Lottery(commands.Cog):
 async def setup(bot):
     cog = Lottery(bot)
 
-    await bot.add_cog(cog)
+    await bot.add_cog(
+        cog
+    )
 
     try:
         bot.tree.add_command(
