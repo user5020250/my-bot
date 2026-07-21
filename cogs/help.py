@@ -99,13 +99,7 @@ class HelpView(discord.ui.View):
         for name, desc in page:
             embed.add_field(
                 name=name,
-                value=desc",
-                inline=False,
-            )
-
-            embed.add_field(
-                name="\u200b",
-                value="\u200b",
+                value=f"{desc}\n",
                 inline=False,
             )
 
