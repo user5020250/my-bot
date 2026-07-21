@@ -71,6 +71,7 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS lottery (
             id INTEGER PRIMARY KEY,
             prize INTEGER NOT NULL,
+            ends_at INTEGER NOT NULL DEFAULT 0,
             active INTEGER NOT NULL DEFAULT 1
         );
 
@@ -157,6 +158,13 @@ def init_db() -> None:
         ).fetchall()
     }
 
+    old_lottery_columns = {
+        row["name"]
+        for row in conn.execute(
+            "PRAGMA table_info(lottery)"
+        ).fetchall()
+    }
+
     if "last_sideline" not in user_columns:
         conn.execute(
             """
@@ -210,6 +218,14 @@ def init_db() -> None:
             """
             ALTER TABLE lotteries
             ADD COLUMN active INTEGER NOT NULL DEFAULT 1
+            """
+        )
+
+    if "ends_at" not in old_lottery_columns:
+        conn.execute(
+            """
+            ALTER TABLE lottery
+            ADD COLUMN ends_at INTEGER NOT NULL DEFAULT 0
             """
         )
 
