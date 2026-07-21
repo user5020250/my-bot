@@ -45,6 +45,7 @@ CATEGORIES = [
             ),
         ],
     ),
+
     (
         "🛒 Shop & Inventory",
         [
@@ -69,11 +70,30 @@ CATEGORIES = [
                 "Protects you from /steal for 24 hours.",
             ),
             (
+                "🎟️ Lottery Ticket",
+                "Use it to enter the global lottery.",
+            ),
+            (
                 "💰 /balance [user]",
                 "Check your balance or another player's balance.",
             ),
         ],
     ),
+
+    (
+        "🎟️ Lottery",
+        [
+            (
+                "🎟️ /use lottery_ticket",
+                "Consume one lottery ticket and enter the next draw.",
+            ),
+            (
+                "🎲 /draw_lottery",
+                "Owner-only command that picks a random winner.",
+            ),
+        ],
+    ),
+
     (
         "🥷 Crime",
         [
@@ -83,6 +103,7 @@ CATEGORIES = [
             ),
         ],
     ),
+
     (
         "🏦 Loans",
         [
@@ -108,6 +129,7 @@ CATEGORIES = [
             ),
         ],
     ),
+
     (
         "💼 Businesses",
         [
@@ -157,6 +179,7 @@ CATEGORIES = [
             ),
         ],
     ),
+
     (
         "📊 Rankings",
         [
@@ -166,6 +189,7 @@ CATEGORIES = [
             ),
         ],
     ),
+
     (
         "ℹ️ Info",
         [
