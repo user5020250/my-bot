@@ -91,6 +91,11 @@ CATEGORIES = [
                 "🎫 /lottery join [tickets]",
                 "`Join the lottery using your lottery tickets.`",
             ),
+            (
+                "🎫 /lottery channel [channel]",
+                "`Set the channel where lottery announcements will be sent.`",
+            ),
+            
         ],
     ),
 
