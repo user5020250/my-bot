@@ -1,7 +1,10 @@
 import os
 import sqlite3
 
-DATA_DIR = os.getenv("DATA_DIR", "data")
+DATA_DIR = os.getenv(
+    "DATA_DIR",
+    "data",
+)
 
 os.makedirs(
     DATA_DIR,
@@ -31,10 +34,14 @@ def init_db() -> None:
         """
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
+
             balance INTEGER NOT NULL DEFAULT 1000,
             job TEXT DEFAULT NULL,
+
             last_trabaho INTEGER NOT NULL DEFAULT 0,
             last_tambay INTEGER NOT NULL DEFAULT 0,
+            last_sideline INTEGER NOT NULL DEFAULT 0,
+
             last_budol INTEGER NOT NULL DEFAULT 0,
             last_baon INTEGER NOT NULL DEFAULT 0,
             last_karaoke INTEGER NOT NULL DEFAULT 0
@@ -42,40 +49,54 @@ def init_db() -> None:
 
         CREATE TABLE IF NOT EXISTS debts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+
             lender TEXT NOT NULL,
             borrower TEXT NOT NULL,
-            amount INTEGER NOT NULL,
-            created_at INTEGER NOT NULL
-        );
 
-        CREATE TABLE IF NOT EXISTS market (
-            item TEXT PRIMARY KEY,
-            display_name TEXT NOT NULL,
-            buy_price INTEGER NOT NULL,
-            sell_price INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
+            amount INTEGER NOT NULL,
+
+            created_at INTEGER NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS inventory (
             user_id TEXT NOT NULL,
             item TEXT NOT NULL,
-            qty INTEGER NOT NULL DEFAULT 0,
 
+            qty INTEGER NOT NULL DEFAULT 0,
             avg_buy_price INTEGER NOT NULL DEFAULT 0,
 
-            PRIMARY KEY (user_id, item)
+            PRIMARY KEY (
+                user_id,
+                item
+            )
         );
         """
     )
 
-    columns = [
+    user_columns = [
+        row["name"]
+        for row in conn.execute(
+            "PRAGMA table_info(users)"
+        ).fetchall()
+    ]
+
+    if "last_sideline" not in user_columns:
+        conn.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN last_sideline
+            INTEGER NOT NULL DEFAULT 0
+            """
+        )
+
+    inventory_columns = [
         row["name"]
         for row in conn.execute(
             "PRAGMA table_info(inventory)"
         ).fetchall()
     ]
 
-    if "avg_buy_price" not in columns:
+    if "avg_buy_price" not in inventory_columns:
         conn.execute(
             """
             ALTER TABLE inventory
@@ -85,5 +106,4 @@ def init_db() -> None:
         )
 
     conn.commit()
-
     conn.close()
