@@ -26,6 +26,7 @@ COGS = [
     "features.inventory", # NEW: /inventory
     "features.sideline", # NEW: /sideline
     "features.profile", # NEW: /profile
+    "features.business",
 ]
 
 
