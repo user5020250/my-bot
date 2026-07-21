@@ -14,6 +14,7 @@ ITEMS = {
             "Protects you from /steal "
             "for 24 hours."
         ),
+        "usable": True,
     },
 
     "lottery_ticket": {
@@ -23,6 +24,7 @@ ITEMS = {
             "Used automatically "
             "when joining lotteries."
         ),
+        "usable": False,
     },
 
     "burger": {
@@ -31,6 +33,7 @@ ITEMS = {
         "description": (
             "Just a burger."
         ),
+        "usable": True,
     },
 }
 
@@ -81,16 +84,24 @@ class Inventory(commands.Cog):
                         "description": (
                             "No description available."
                         ),
+                        "usable": False,
                     },
+                )
+
+                usable_text = (
+                    "Usable"
+                    if item_data["usable"]
+                    else "Not usable"
                 )
 
                 embed.add_field(
                     name=(
                         f"{item_data['emoji']} "
-                        f"{item_data['name']} "
-                        f"×{row['qty']}"
+                        f"{item_data['name']}"
                     ),
                     value=(
+                        f"`Qty: {row['qty']}` "
+                        f"`{usable_text}`\n"
                         f"`{item_data['description']}`"
                     ),
                     inline=False,
