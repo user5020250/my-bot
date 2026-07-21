@@ -22,9 +22,10 @@ COGS = [
     "features.economy",   # NEW: /jobs /trabaho /tambay /sugal /baon
     "features.social",    # NEW: /utang /bayad /budol /karaoke
     "features.admin",     # NEW: /give
-    "features.help",      # NEW: /help command
-    "features.inventory",
-    "features.sideline",
+    "features.help",      # NEW: /help
+    "features.inventory", # NEW: /inventory
+    "features.sideline", # NEW: /sideline
+    "features.profile", # NEW: /profile
 ]
 
 
