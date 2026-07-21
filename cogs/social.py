@@ -30,17 +30,16 @@ class Social(commands.Cog):
         lender_id = str(lender.id)
 
         if lender_id == borrower_id:
-            await interaction.response.send_message("Hindi ka pwedeng mangutang sa sarili mo. 😅", ephemeral=True)
+            await interaction.response.send_message("You can't utang from yourself 💀 make it make sense.")
             return
         if lender.bot:
-            await interaction.response.send_message("Hindi pwedeng mangutang sa bot.", ephemeral=True)
+            await interaction.response.send_message("Bots don't do utang, sorry.")
             return
 
         lender_user = db.get_user(lender_id)
         if lender_user["balance"] < amount:
             await interaction.response.send_message(
-                f"Wala pang sapat pera si {lender.display_name} para pautangin ka.",
-                ephemeral=True,
+                f"{lender.display_name} is also broke, they can't lend you that. 💀",
             )
             return
 
@@ -57,11 +56,11 @@ class Social(commands.Cog):
 
         embed = discord.Embed(
             title="🤝 Utang Approved",
-            description=f"{interaction.user.mention} nangutang ng **{db.format_peso(amount)}** "
-            f"kay {lender.mention}. Bayaran mo agad ha! Gamitin ang `/bayad`.",
+            description=f"{interaction.user.mention} borrowed **{db.format_peso(amount)}** "
+            f"from {lender.mention}. Pay it back before it gets awkward — use `/bayad`.",
             color=discord.Color.blue(),
         )
-        embed.set_footer(text=f"Balance mo ngayon: {db.format_peso(new_borrower_balance)}")
+        embed.set_footer(text=f"Your balance: {db.format_peso(new_borrower_balance)}")
         await interaction.response.send_message(embed=embed)
 
     # -------------------------------------------------------------- /bayad
@@ -86,7 +85,7 @@ class Social(commands.Cog):
         if total_owed == 0:
             conn.close()
             await interaction.response.send_message(
-                f"Wala kang utang kay {lender.display_name}.", ephemeral=True
+                f"You don't owe {lender.display_name} anything. You're good.",
             )
             return
 
@@ -95,7 +94,7 @@ class Social(commands.Cog):
 
         if pay_amount <= 0:
             conn.close()
-            await interaction.response.send_message("Wala kang sapat na pera para magbayad.", ephemeral=True)
+            await interaction.response.send_message("You don't have enough cash to pay that back rn.")
             return
 
         remaining_to_clear = pay_amount
@@ -116,11 +115,11 @@ class Social(commands.Cog):
         db.add_balance(lender_id, pay_amount)
 
         left = total_owed - pay_amount
-        desc = f"Binayaran mo si {lender.mention} ng **{db.format_peso(pay_amount)}**."
+        desc = f"Paid {lender.mention} **{db.format_peso(pay_amount)}**."
         if left > 0:
-            desc += f"\nNatitira ka pang utang na **{db.format_peso(left)}**."
+            desc += f"\nStill owe **{db.format_peso(left)}** though, keep it up."
         else:
-            desc += "\nWala ka nang utang sa kanya! 🎉"
+            desc += "\nDebt fully cleared! Certified honorable. 🫡"
 
         embed = discord.Embed(title="💵 Bayad Utang", description=desc, color=discord.Color.green())
         await interaction.response.send_message(embed=embed)
@@ -133,17 +132,16 @@ class Social(commands.Cog):
         target_id = str(target.id)
 
         if target_id == scammer_id:
-            await interaction.response.send_message("Hindi mo pwedeng budol-budolin ang sarili mo. 😂", ephemeral=True)
+            await interaction.response.send_message("You can't budol yourself, that's just called losing money 😭")
             return
         if target.bot:
-            await interaction.response.send_message("Hindi pwedeng i-budol ang bot.", ephemeral=True)
+            await interaction.response.send_message("Bots don't fall for budol, nice try.")
             return
 
         remaining = db.check_cooldown(scammer_id, "last_budol", BUDOL_COOLDOWN_SECONDS)
         if remaining > 0:
             await interaction.response.send_message(
-                f"⏳ Baka mahalata ka. Try ulit in {db.format_duration(remaining)}.",
-                ephemeral=True,
+                f"⏳ Lay low for now, people are onto you. Try again in {db.format_duration(remaining)}.",
             )
             return
 
@@ -156,7 +154,7 @@ class Social(commands.Cog):
             if stolen <= 0:
                 embed = discord.Embed(
                     title="🎭 Budol Attempt",
-                    description=f"Sinubukan mong i-budol si {target.mention} pero wala naman siyang pera. Sayang!",
+                    description=f"Tried to budol {target.mention} but they're broke too. Nothing to take, L attempt.",
                     color=discord.Color.greyple(),
                 )
             else:
@@ -164,7 +162,7 @@ class Social(commands.Cog):
                 new_balance = db.add_balance(scammer_id, stolen)
                 embed = discord.Embed(
                     title="🎭 Budol Success!",
-                    description=f"Na-budol mo si {target.mention} ng **{db.format_peso(stolen)}**! 😈",
+                    description=f"Scammed {target.mention} out of **{db.format_peso(stolen)}**. Menace behavior. 😈",
                     color=discord.Color.green(),
                 )
                 embed.set_footer(text=f"Balance: {db.format_peso(new_balance)}")
@@ -172,9 +170,9 @@ class Social(commands.Cog):
             penalty = random.randint(100, 1000)
             new_balance = db.add_balance(scammer_id, -penalty)
             embed = discord.Embed(
-                title="🎭 Budol Failed — Nahuli Ka!",
-                description=f"Nahalata ka ni {target.mention} at na-report ka. "
-                f"Nawalan ka ng **{db.format_peso(penalty)}** sa multa.",
+                title="🎭 Budol Failed — Caught In 4K",
+                description=f"{target.mention} clocked the scam instantly and reported you. "
+                f"Fined **{db.format_peso(penalty)}**. The audacity, and it didn't even work.",
                 color=discord.Color.red(),
             )
             embed.set_footer(text=f"Balance: {db.format_peso(new_balance)}")
@@ -188,8 +186,7 @@ class Social(commands.Cog):
         remaining = db.check_cooldown(user_id, "last_karaoke", KARAOKE_COOLDOWN_SECONDS)
         if remaining > 0:
             await interaction.response.send_message(
-                f"⏳ Paos ka pa. Kumanta ulit in {db.format_duration(remaining)}.",
-                ephemeral=True,
+                f"⏳ Give the mic a break. Try again in {db.format_duration(remaining)}.",
             )
             return
 
@@ -201,9 +198,9 @@ class Social(commands.Cog):
         song = random.choice(songs)
 
         embed = discord.Embed(
-            title="🎤 Videoke Time!",
-            description=f"Kinanta mo ang **\"{song}\"** at natuwa ang mga kapitbahay. "
-            f"Natanggap ka ng **{db.format_peso(tip)}** na tip!",
+            title="🎤 Videoke Time",
+            description=f"Belted out **\"{song}\"** and the neighbors actually loved it. "
+            f"Got **{db.format_peso(tip)}** in tips. Superstar behavior fr.",
             color=discord.Color.purple(),
         )
         embed.set_footer(text=f"Balance: {db.format_peso(new_balance)}")
