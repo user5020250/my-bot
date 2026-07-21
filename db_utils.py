@@ -580,6 +580,45 @@ def remove_inventory(
 
     return True
 
+# ==========================================================
+# MONEY PARSER
+# ==========================================================
+
+def parse_money(
+    text: str,
+) -> int:
+
+    text = text.lower().strip()
+
+    multipliers = {
+        "k": 1_000,
+        "m": 1_000_000,
+        "b": 1_000_000_000,
+        "t": 1_000_000_000_000,
+    }
+
+    try:
+        suffix = text[-1]
+
+        if suffix in multipliers:
+
+            number = float(
+                text[:-1]
+            )
+
+            return int(
+                number * multipliers[suffix]
+            )
+
+        return int(text)
+
+    except (
+        ValueError,
+        IndexError,
+    ):
+        raise ValueError(
+            "Invalid amount."
+        )
 
 # ==========================================================
 # FORMATTING
