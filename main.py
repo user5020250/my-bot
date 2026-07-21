@@ -19,13 +19,12 @@ COGS = [
     "cogs.server",
     "cogs.message",
     "cogs.role",
-    "cogs.economy",   # NEW: /jobs /trabaho /tambay /sugal /baon
-    "cogs.market",    # NEW: /palengke /load
-    "cogs.social",    # NEW: /utang /bayad /budol /karaoke
-    "cogs.admin",     # NEW: /give
-    "cogs.help",      # NEW: /help command
-    "cogs.inventory",
-    "cogs.sideline",
+    "features.economy",   # NEW: /jobs /trabaho /tambay /sugal /baon
+    "features.social",    # NEW: /utang /bayad /budol /karaoke
+    "features.admin",     # NEW: /give
+    "features.help",      # NEW: /help command
+    "features.inventory",
+    "features.sideline",
 ]
 
 
