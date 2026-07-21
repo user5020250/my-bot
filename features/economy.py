@@ -40,7 +40,7 @@ class Economy(commands.Cog):
             embed.add_field(
                 name=info["label"],
                 value=(
-                    f"{db.format_peso(info['min'])} – "
+                    f"{db.format_peso(info['min'])} - "
                     f"{db.format_peso(info['max'])}\n"
                     f"*{info['flavor']}*"
                 ),
@@ -180,9 +180,9 @@ class Economy(commands.Cog):
             )
             return
 
-        win = random.random() < 0.5
+        won = random.random() < 0.5
 
-        if win:
+        if won:
             new_balance = db.add_balance(
                 user_id,
                 amount,
@@ -254,9 +254,7 @@ class Economy(commands.Cog):
 
         embed = discord.Embed(
             title="Allowance Claimed",
-            description=(
-                f"You received **{db.format_peso(amount)}**."
-            ),
+            description=f"You received **{db.format_peso(amount)}**.",
             color=WHITE,
         )
 
