@@ -16,7 +16,7 @@ KARAOKE_COOLDOWN_SECONDS = 5 * 60
 
 BUDOL_SUCCESS_CHANCE = 0.4
 
-# ------------------------------------------------------------------ /utang
+# ------------------------------------------------------------------ /loan
 
 LOAN_INTEREST_RATE = 0.20
 LOAN_DUE_DAYS = 7
@@ -146,7 +146,7 @@ def escalate_if_overdue(conn, loan):
 class LoanRequestView(discord.ui.View):
     """
     Confirmation buttons shown to the lender when a borrower
-    sends a /utang request. Expires automatically after
+    sends a /loan request. Expires automatically after
     LOAN_REQUEST_TIMEOUT_SECONDS.
     """
 
@@ -174,7 +174,7 @@ class LoanRequestView(discord.ui.View):
 
     def _closed_embed(self, description: str, color: discord.Color) -> discord.Embed:
         embed = discord.Embed(
-            title="Loan Request",
+            title="💸 Loan Request",
             description=description,
             color=color,
         )
@@ -194,9 +194,8 @@ class LoanRequestView(discord.ui.View):
             try:
                 await self.message.edit(
                     embed=self._closed_embed(
-                        f"Nag-expire na ang loan request ni "
-                        f"{self.borrower.mention} kay "
-                        f"{self.lender.mention}.",
+                        f"⌛ {self.borrower.mention}'s loan request to "
+                        f"{self.lender.mention} has expired.",
                         WHITE,
                     ),
                     view=self,
@@ -216,14 +215,14 @@ class LoanRequestView(discord.ui.View):
     ):
         if interaction.user.id != self.lender.id:
             await interaction.response.send_message(
-                "Hindi para sa'yo ang request na ito.",
+                "🚫 This request isn't for you.",
                 ephemeral=True,
             )
             return
 
         if self.resolved:
             await interaction.response.send_message(
-                "Tapos na ang request na ito.",
+                "🔒 This request has already been resolved.",
                 ephemeral=True,
             )
             return
@@ -239,8 +238,8 @@ class LoanRequestView(discord.ui.View):
 
             await interaction.response.edit_message(
                 embed=self._closed_embed(
-                    f"Hindi na-approve. Wala nang sapat na pera si "
-                    f"{self.lender.mention}.",
+                    f"🚫 Not approved. {self.lender.mention} doesn't have "
+                    f"enough money.",
                     WHITE,
                 ),
                 view=self,
@@ -289,7 +288,7 @@ class LoanRequestView(discord.ui.View):
             child.disabled = True
 
         embed = discord.Embed(
-            title="Loan Approved",
+            title="✅ Loan Approved",
             description=(
                 f"{self.lender.mention} lent "
                 f"**{db.format_peso(self.principal)}** "
@@ -297,13 +296,13 @@ class LoanRequestView(discord.ui.View):
                 f"Total due: **{db.format_peso(self.total_due)}**\n"
                 f"Due date: <t:{self.due_ts}:D>\n"
                 f"Loan ID: `{loan_id}`\n\n"
-                f"Use `/utang pay` to repay."
+                f"Use `/loan pay` to repay."
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=f"{self.borrower.display_name}'s balance: {db.format_peso(new_balance)}"
+            text=f"💰 {self.borrower.display_name}'s balance: {db.format_peso(new_balance)}"
         )
 
         await interaction.response.edit_message(
@@ -323,14 +322,14 @@ class LoanRequestView(discord.ui.View):
     ):
         if interaction.user.id != self.lender.id:
             await interaction.response.send_message(
-                "Hindi para sa'yo ang request na ito.",
+                "🚫 This request isn't for you.",
                 ephemeral=True,
             )
             return
 
         if self.resolved:
             await interaction.response.send_message(
-                "Tapos na ang request na ito.",
+                "🔒 This request has already been resolved.",
                 ephemeral=True,
             )
             return
@@ -343,7 +342,7 @@ class LoanRequestView(discord.ui.View):
 
         await interaction.response.edit_message(
             embed=self._closed_embed(
-                "Loan request declined.",
+                "❌ Loan request declined.",
                 WHITE,
             ),
             view=self,
@@ -358,14 +357,14 @@ class Social(commands.Cog):
 
         ensure_loans_table()
 
-    # ---------------------------------------------------------- /utang group
+    # ---------------------------------------------------------- /loan group
 
     utang_group = app_commands.Group(
-        name="utang",
-        description="Loan system.",
+        name="loan",
+        description="💰 Loan system.",
     )
 
-    # ------------------------------------------------------ /utang request
+    # ------------------------------------------------------- /loan request
 
     @utang_group.command(
         name="request",
@@ -387,13 +386,13 @@ class Social(commands.Cog):
 
         if lender_id == borrower_id:
             await interaction.response.send_message(
-                "Hindi ka puwedeng umutang sa sarili mo."
+                "🚫 You can't borrow from yourself."
             )
             return
 
         if lender.bot:
             await interaction.response.send_message(
-                "Hindi nagpapautang ang bots."
+                "🤖 Bots don't lend money."
             )
             return
 
@@ -429,10 +428,10 @@ class Social(commands.Cog):
             ]
 
             await interaction.response.send_message(
-                "Hindi ka puwedeng umutang, may overdue ka pa:\n"
+                "🚫 You can't take out a loan, you still have overdue loans:\n"
                 + "\n".join(lines)
-                + "\n\nBayaran mo muna gamit ang `/utang pay` — "
-                "mas tumataas pa ang tubo habang hindi bayad.",
+                + "\n\nPay them off first with `/loan pay` — "
+                "the interest keeps climbing the longer you wait.",
                 ephemeral=True,
             )
             return
@@ -468,7 +467,7 @@ class Social(commands.Cog):
         )
 
         embed.set_footer(
-            text=f"Expires in {LOAN_REQUEST_TIMEOUT_SECONDS} seconds"
+            text=f"⏳ Expires in {LOAN_REQUEST_TIMEOUT_SECONDS} seconds"
         )
 
         await interaction.response.send_message(
@@ -480,7 +479,7 @@ class Social(commands.Cog):
         view.message = await interaction.original_response()
         self.pending_requests[request_id] = view
 
-        # ----------------------------------------------------------- /utang pay
+        # ------------------------------------------------------- /loan pay
 
     @utang_group.command(
         name="pay",
@@ -518,7 +517,7 @@ class Social(commands.Cog):
             conn.close()
 
             await interaction.response.send_message(
-                f"Walang active loan na may ID `{loan_id}`.",
+                f"❌ No active loan found with ID `{loan_id}`.",
                 ephemeral=True,
             )
             return
@@ -539,7 +538,7 @@ class Social(commands.Cog):
             conn.close()
 
             await interaction.response.send_message(
-                "Wala kang sapat na pera.",
+                "💸 You don't have enough money.",
                 ephemeral=True,
             )
             return
@@ -591,13 +590,13 @@ class Social(commands.Cog):
 
         if loan["overdue_count"] > 0 and new_remaining > 0:
             description += (
-                f"\n\n⚠️ Na-escalate na ang loan na ito ng "
-                f"{loan['overdue_count']}x dahil sa late payment. "
-                f"Kung hindi pa rin mabayaran, tuloy-tuloy pa ang tubo."
+                f"\n\n⚠️ This loan has been escalated "
+                f"{loan['overdue_count']}x due to late payment. "
+                f"If it's still not paid off, interest will keep climbing."
             )
 
         embed = discord.Embed(
-            title="Bayad Utang",
+            title="💵 Loan Payment",
             color=WHITE,
             description=description,
         )
@@ -605,7 +604,7 @@ class Social(commands.Cog):
         await interaction.response.send_message(
             embed=embed
         )
-    # ---------------------------------------------------------- /utang list
+    # ---------------------------------------------------------- /loan list
 
     @utang_group.command(
         name="list",
@@ -647,7 +646,7 @@ class Social(commands.Cog):
         conn.close()
 
         embed = discord.Embed(
-            title="Utang Overview",
+            title="📒 Loan Overview",
             color=WHITE,
         )
 
@@ -667,14 +666,14 @@ class Social(commands.Cog):
                 lines.append(line)
 
             embed.add_field(
-                name="You owe",
+                name="📤 You owe",
                 value="\n".join(lines),
                 inline=False,
             )
         else:
             embed.add_field(
-                name="You owe",
-                value="Wala.",
+                name="📤 You owe",
+                value="Nothing.",
                 inline=False,
             )
 
@@ -694,20 +693,20 @@ class Social(commands.Cog):
                 lines.append(line)
 
             embed.add_field(
-                name="Owed to you",
+                name="📥 Owed to you",
                 value="\n".join(lines),
                 inline=False,
             )
         else:
             embed.add_field(
-                name="Owed to you",
-                value="Wala.",
+                name="📥 Owed to you",
+                value="Nothing.",
                 inline=False,
             )
 
         await interaction.response.send_message(embed=embed)
 
-    # ---------------------------------------------------------- /utang info
+    # ---------------------------------------------------------- /loan info
 
     @utang_group.command(
         name="info",
@@ -735,7 +734,7 @@ class Social(commands.Cog):
 
         if loan is None:
             await interaction.response.send_message(
-                f"Walang loan na may ID `{loan_id}`."
+                f"❌ No loan found with ID `{loan_id}`."
             )
             return
 
@@ -743,7 +742,7 @@ class Social(commands.Cog):
 
         if user_id not in (loan["lender"], loan["borrower"]):
             await interaction.response.send_message(
-                "Hindi mo makikita ang loan na ito."
+                "🚫 You can't view this loan."
             )
             return
 
@@ -768,14 +767,14 @@ class Social(commands.Cog):
                 )
 
         embed = discord.Embed(
-            title=f"Loan #{loan['id']}",
+            title=f"📄 Loan #{loan['id']}",
             description=description,
             color=WHITE,
         )
 
         await interaction.response.send_message(embed=embed)
 
-    # -------------------------------------------------------- /utang cancel
+    # ------------------------------------------------------- /loan cancel
 
     @utang_group.command(
         name="cancel",
@@ -793,13 +792,13 @@ class Social(commands.Cog):
 
         if view is None:
             await interaction.response.send_message(
-                f"Walang pending request na may ID `{request_id}`."
+                f"❌ No pending request found with ID `{request_id}`."
             )
             return
 
         if view.borrower.id != interaction.user.id:
             await interaction.response.send_message(
-                "Hindi mo request ito."
+                "🚫 That's not your request."
             )
             return
 
@@ -813,10 +812,10 @@ class Social(commands.Cog):
             try:
                 await view.message.edit(
                     embed=discord.Embed(
-                        title="Loan Request",
+                        title="💸 Loan Request",
                         description=(
-                            f"Kinansela ni {view.borrower.mention} "
-                            f"ang loan request niya."
+                            f"❌ {view.borrower.mention} cancelled "
+                            f"their loan request."
                         ),
                         color=WHITE,
                     ),
@@ -826,13 +825,13 @@ class Social(commands.Cog):
                 pass
 
         await interaction.response.send_message(
-            f"Kinansela ang request `{request_id}`."
+            f"✅ Cancelled request `{request_id}`."
         )
 
-    # -------------------------------------------------------------- /budol
+    # --------------------------------------------------------------- /scam
 
     @app_commands.command(
-        name="budol",
+        name="scam",
         description="Try to scam another player.",
     )
     @app_commands.describe(
@@ -853,13 +852,13 @@ class Social(commands.Cog):
 
         if target_id == scammer_id:
             await interaction.response.send_message(
-                "Hindi mo puwedeng i-budol ang sarili mo."
+                "🚫 You can't scam yourself."
             )
             return
 
         if target.bot:
             await interaction.response.send_message(
-                "Hindi naloloko ang bots."
+                "🤖 Bots can't be scammed."
             )
             return
 
@@ -871,7 +870,7 @@ class Social(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"Mainit ka pa. "
+                f"🔥 Still too hot. "
                 f"Try again in "
                 f"**{db.format_duration(remaining)}**."
             )
@@ -906,10 +905,10 @@ class Social(commands.Cog):
 
             if stolen <= 0:
                 embed = discord.Embed(
-                    title="Budol Attempt",
+                    title="🎭 Scam Attempt",
                     description=(
-                        f"Wala ring pera si "
-                        f"{target.mention}."
+                        f"{target.mention} doesn't have any money "
+                        f"either."
                     ),
                     color=WHITE,
                 )
@@ -926,11 +925,11 @@ class Social(commands.Cog):
                 )
 
                 embed = discord.Embed(
-                    title="Budol Success",
+                    title="🎉 Scam Success",
                     description=(
-                        f"Nakakuha ka ng "
+                        f"You got away with "
                         f"**{db.format_peso(stolen)}** "
-                        f"mula kay "
+                        f"from "
                         f"{target.mention}."
                     ),
                     color=WHITE,
@@ -938,7 +937,7 @@ class Social(commands.Cog):
 
                 embed.set_footer(
                     text=(
-                        f"Balance: "
+                        f"💰 Balance: "
                         f"{db.format_peso(new_balance)}"
                     )
                 )
@@ -955,11 +954,10 @@ class Social(commands.Cog):
             )
 
             embed = discord.Embed(
-                title="Budol Failed",
+                title="🚨 Scam Failed",
                 description=(
-                    f"Nahuli ka ni "
-                    f"{target.mention}.\n\n"
-                    f"Multa: "
+                    f"{target.mention} caught you in the act.\n\n"
+                    f"Fine: "
                     f"**{db.format_peso(penalty)}**."
                 ),
                 color=WHITE,
@@ -967,7 +965,7 @@ class Social(commands.Cog):
 
             embed.set_footer(
                 text=(
-                    f"Balance: "
+                    f"💰 Balance: "
                     f"{db.format_peso(new_balance)}"
                 )
             )
@@ -980,7 +978,7 @@ class Social(commands.Cog):
 
     @app_commands.command(
         name="karaoke",
-        description="Kumanta para kumita.",
+        description="Sing to earn some cash.",
     )
     async def karaoke(
         self,
@@ -998,7 +996,7 @@ class Social(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"Nagpapahinga pa ang mic.\n"
+                f"🎤 The mic needs a rest.\n"
                 f"Try again in "
                 f"**{db.format_duration(remaining)}**."
             )
@@ -1038,18 +1036,18 @@ class Social(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Videoke Time",
+            title="🎤 Videoke Time",
             description=(
-                f"Kumanta ka ng "
+                f"You sang "
                 f"**{song}**.\n\n"
-                f"Kumita ka ng "
+                f"You earned "
                 f"**{db.format_peso(tip)}**."
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=f"Balance: {db.format_peso(new_balance)}"
+            text=f"💰 Balance: {db.format_peso(new_balance)}"
         )
 
         await interaction.response.send_message(
