@@ -29,26 +29,6 @@ COMMANDS = [
         "Flip a coin and bet your money. Win big or lose everything. No cooldown.",
     ),
     (
-        "/palengke presyo",
-        "Check the latest prices for rice, fish, mangoes, chicken, meat, and vegetables.",
-    ),
-    (
-        "/palengke bili item: [item] quantity: [amount]",
-        "Buy items from the palengke to keep or resell later.",
-    ),
-    (
-        "/palengke benta item: [item] quantity: [amount]",
-        "Sell the items you own and make a profit.",
-    ),
-    (
-        "/load bili quantity: [amount]",
-        "Buy mobile load in bulk.",
-    ),
-    (
-        "/load benta quantity: [amount]",
-        "Resell your mobile load for a random profit.",
-    ),
-    (
         "/utang lender: [user] amount: [₱]",
         "Borrow money from another player.",
     ),
