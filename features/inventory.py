@@ -88,20 +88,20 @@ class Inventory(commands.Cog):
                     },
                 )
 
-                usable_text = (
-                    "Usable"
+                status = (
+                    "🟢 Usable"
                     if item_data["usable"]
-                    else "Not usable"
+                    else "🔴 Not usable"
                 )
 
                 embed.add_field(
                     name=(
                         f"{item_data['emoji']} "
-                        f"{item_data['name']}"
+                        f"{item_data['name']} "
+                        f"`{status}`"
                     ),
                     value=(
-                        f"`Qty: {row['qty']}` "
-                        f"`{usable_text}`\n"
+                        f"`Qty: {row['qty']}`\n"
                         f"`{item_data['description']}`"
                     ),
                     inline=False,
