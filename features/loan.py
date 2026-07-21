@@ -11,11 +11,6 @@ import db_utils as db
 
 WHITE = discord.Color(0xFFFFFF)
 
-BUDOL_COOLDOWN_SECONDS = 24 * 60 * 60
-KARAOKE_COOLDOWN_SECONDS = 5 * 60
-
-BUDOL_SUCCESS_CHANCE = 0.4
-
 # ------------------------------------------------------------------ /loan
 
 LOAN_INTEREST_RATE = 0.20
