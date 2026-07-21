@@ -10,8 +10,8 @@ import db_utils as db
 
 WHITE = discord.Color(0xFFFFFF)
 
-TAMBAY_COOLDOWN_SECONDS = 60
-BAON_COOLDOWN_SECONDS = 24 * 60 * 60
+WORK_COOLDOWN_SECONDS = TRABAHO_COOLDOWN_SECONDS
+ALLOWANCE_COOLDOWN_SECONDS = 24 * 60 * 60
 
 JOB_CHOICES = [
     app_commands.Choice(name=info["label"], value=key)
@@ -31,8 +31,8 @@ class Economy(commands.Cog):
     )
     async def jobs(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title="Trabaho Menu",
-            description="Choose a job with `/trabaho job:[job]`.",
+            title="Job Menu",
+            description="Choose a job with `/work job:[job]`.",
             color=WHITE,
         )
 
@@ -51,11 +51,11 @@ class Economy(commands.Cog):
             embed=embed
         )
 
-    # ------------------------------------------------------------- /trabaho
+    # ----------------------------------------------------------------- /work
 
     @app_commands.command(
-        name="trabaho",
-        description="Choose a job or work.",
+        name="work",
+        description="Choose a job or work your shift.",
     )
     @app_commands.describe(
         job="Pick a job."
@@ -63,7 +63,7 @@ class Economy(commands.Cog):
     @app_commands.choices(
         job=JOB_CHOICES
     )
-    async def trabaho(
+    async def work(
         self,
         interaction: discord.Interaction,
         job: app_commands.Choice[str] = None,
@@ -89,7 +89,7 @@ class Economy(commands.Cog):
             await interaction.response.send_message(
                 f"You are now a "
                 f"**{info['label']}**.\n"
-                f"Use `/trabaho` to work."
+                f"Use `/work` to work."
             )
             return
 
@@ -101,14 +101,14 @@ class Economy(commands.Cog):
         ):
             await interaction.response.send_message(
                 "You don't have a job.\n"
-                "Use `/trabaho job:[job]`."
+                "Use `/work job:[job]`."
             )
             return
 
         remaining = db.check_cooldown(
             user_id,
             "last_trabaho",
-            TRABAHO_COOLDOWN_SECONDS,
+            WORK_COOLDOWN_SECONDS,
         )
 
         if remaining > 0:
@@ -160,102 +160,16 @@ class Economy(commands.Cog):
             embed=embed
         )
 
-    # -------------------------------------------------------------- /tambay
+    # -------------------------------------------------------------- /scatter
 
     @app_commands.command(
-        name="tambay",
-        description="Tambay with friends.",
-    )
-    async def tambay(
-        self,
-        interaction: discord.Interaction,
-    ):
-        user_id = str(
-            interaction.user.id
-        )
-
-        remaining = db.check_cooldown(
-            user_id,
-            "last_tambay",
-            TAMBAY_COOLDOWN_SECONDS,
-        )
-
-        if remaining > 0:
-            await interaction.response.send_message(
-                f"Try again in "
-                f"**{db.format_duration(remaining)}**."
-            )
-            return
-
-        db.set_cooldown(
-            user_id,
-            "last_tambay",
-            int(time.time()),
-        )
-
-        win = random.random() < 0.7
-
-        if win:
-            amount = random.randint(
-                50,
-                300,
-            )
-
-            new_balance = db.add_balance(
-                user_id,
-                amount,
-            )
-
-            embed = discord.Embed(
-                title="Tambay",
-                description=(
-                    f"You earned "
-                    f"**{db.format_peso(amount)}**."
-                ),
-                color=WHITE,
-            )
-
-        else:
-            amount = random.randint(
-                20,
-                150,
-            )
-
-            new_balance = db.add_balance(
-                user_id,
-                -amount,
-            )
-
-            embed = discord.Embed(
-                title="Tambay",
-                description=(
-                    f"You lost "
-                    f"**{db.format_peso(amount)}**."
-                ),
-                color=WHITE,
-            )
-
-        embed.set_footer(
-            text=(
-                f"Balance: "
-                f"{db.format_peso(new_balance)}"
-            )
-        )
-
-        await interaction.response.send_message(
-            embed=embed
-        )
-
-    # --------------------------------------------------------------- /sugal
-
-    @app_commands.command(
-        name="sugal",
+        name="scatter",
         description="50/50 gamble.",
     )
     @app_commands.describe(
         amount="Bet amount."
     )
-    async def sugal(
+    async def scatter(
         self,
         interaction: discord.Interaction,
         amount: app_commands.Range[int, 1],
@@ -318,13 +232,13 @@ class Economy(commands.Cog):
             embed=embed
         )
 
-    # --------------------------------------------------------------- /baon
+    # ------------------------------------------------------------- /allowance
 
     @app_commands.command(
-        name="baon",
-        description="Claim your daily baon.",
+        name="allowance",
+        description="Claim your daily allowance.",
     )
-    async def baon(
+    async def allowance(
         self,
         interaction: discord.Interaction,
     ):
@@ -335,7 +249,7 @@ class Economy(commands.Cog):
         remaining = db.check_cooldown(
             user_id,
             "last_baon",
-            BAON_COOLDOWN_SECONDS,
+            ALLOWANCE_COOLDOWN_SECONDS,
         )
 
         if remaining > 0:
@@ -362,7 +276,7 @@ class Economy(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Baon Claimed",
+            title="Allowance Claimed",
             description=(
                 f"You received "
                 f"**{db.format_peso(amount)}**."
