@@ -10,54 +10,146 @@ INTRO = (
     "Use the buttons below to browse commands, or press ✖ to close this menu."
 )
 
-COMMANDS = [
+CATEGORIES = [
     (
-        "/jobs",
-        "View all available jobs and see how much each one pays.",
+        "💰 Economy",
+        [
+            (
+                "/jobs",
+                "View all available jobs and see how much each one pays.",
+            ),
+            (
+                "/trabaho job: [job]",
+                "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 24 hours.",
+            ),
+            (
+                "/tambay",
+                "Hang out with the barkada for a chance to earn some quick cash. "
+                "70% chance to win, 30% chance to lose money on snacks or yosi. Cooldown: 1 minute.",
+            ),
+            (
+                "/sugal amount: [₱]",
+                "Flip a coin and bet your money. Win big or lose everything. No cooldown.",
+            ),
+            (
+                "/karaoke",
+                "Sing for tips and earn ₱50–₱500. Cooldown: 5 minutes.",
+            ),
+            (
+                "/baon",
+                "Claim your daily allowance of ₱50–₱100. Cooldown: 24 hours.",
+            ),
+        ],
     ),
     (
-        "/trabaho job: [job]",
-        "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 24 hours.",
+        "🏦 Loans",
+        [
+            (
+                "/utang request lender: [user] amount: [₱]",
+                "Send a loan request to another player. They get 60 seconds to approve or decline. 20% interest, due in 7 days.",
+            ),
+            (
+                "/utang pay amount: [₱]",
+                "Pay off your active loans, oldest due date first.",
+            ),
+            (
+                "/utang list",
+                "See all loans you owe and all loans owed to you.",
+            ),
+            (
+                "/utang info loan_id: [id]",
+                "View details for a specific loan.",
+            ),
+            (
+                "/utang cancel request_id: [id]",
+                "Cancel a loan request you sent before the lender responds.",
+            ),
+        ],
     ),
     (
-        "/tambay",
-        "Hang out with the barkada for a chance to earn some quick cash. "
-        "70% chance to win, 30% chance to lose money on snacks or yosi. Cooldown: 1 minute.",
+        "😈 Scamming",
+        [
+            (
+                "/budol target: [user]",
+                "Try to scam another player. High risk, high reward. Cooldown: 1 day.",
+            ),
+        ],
     ),
     (
-        "/sugal amount: [₱]",
-        "Flip a coin and bet your money. Win big or lose everything. No cooldown.",
+        "💼 Businesses",
+        [
+            (
+                "/business list",
+                "Show all available businesses and their prices.",
+            ),
+            (
+                "/business buy business: [business]",
+                "Buy a business.",
+            ),
+            (
+                "/business sell business: [business]",
+                "Sell a business back to the bot.",
+            ),
+            (
+                "/business portfolio",
+                "Show all businesses you own.",
+            ),
+            (
+                "/business collect business: [business]",
+                "Collect income from one business, or leave it blank to collect from all of them.",
+            ),
+            (
+                "/business upgrade business: [business]",
+                "Upgrade a business to increase its income.",
+            ),
+            (
+                "/business stats business: [business]",
+                "Show lifetime earnings, level, and next upgrade cost for a business.",
+            ),
+            (
+                "/business leaderboard",
+                "Show the richest business owners.",
+            ),
+            (
+                "/business raid target: [user]",
+                "Attempt to steal from another player's business.",
+            ),
+            (
+                "/business defend",
+                "Hire security for temporary protection against raids.",
+            ),
+            (
+                "/business bankrupt business: [business]",
+                "Close a business permanently. No refund.",
+            ),
+        ],
     ),
     (
-        "/utang lender: [user] amount: [₱]",
-        "Borrow money from another player.",
-    ),
-    (
-        "/bayad lender: [user] amount: [₱]",
-        "Pay back your debt.",
-    ),
-    (
-        "/budol target: [user]",
-        "Try to scam another player. High risk, high reward. Cooldown: 1 day.",
-    ),
-    (
-        "/karaoke",
-        "Sing for tips and earn ₱50–₱500. Cooldown: 5 minutes.",
-    ),
-    (
-        "/baon",
-        "Claim your daily allowance of ₱50–₱100. Cooldown: 24 hours.",
-    ),
-    (
-        "/profile user: [user]",
-        "View your profile or another player's balance, job, and cooldowns.",
+        "ℹ️ Info",
+        [
+            (
+                "/profile user: [user]",
+                "View your profile or another player's balance, job, and cooldowns.",
+            ),
+        ],
     ),
 ]
 
-PAGES = [
-    COMMANDS[i:i + COMMANDS_PER_PAGE]
-    for i in range(0, len(COMMANDS), COMMANDS_PER_PAGE)
-]
+PAGES = []
+
+for category_name, category_commands in CATEGORIES:
+    chunks = [
+        category_commands[i:i + COMMANDS_PER_PAGE]
+        for i in range(0, len(category_commands), COMMANDS_PER_PAGE)
+    ] or [[]]
+
+    for chunk in chunks:
+        PAGES.append(
+            {
+                "category": category_name,
+                "commands": chunk,
+            }
+        )
 
 
 class HelpView(discord.ui.View):
@@ -71,12 +163,12 @@ class HelpView(discord.ui.View):
         page = PAGES[self.index]
 
         embed = discord.Embed(
-            title="Commands",
+            title=f"Commands — {page['category']}",
             description=INTRO if self.index == 0 else None,
             color=WHITE,
         )
 
-        for name, desc in page:
+        for name, desc in page["commands"]:
             embed.add_field(
                 name=name,
                 value=f"{desc}\n\u200b",
