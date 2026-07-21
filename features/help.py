@@ -7,44 +7,212 @@ WHITE = discord.Color(0xFFFFFF)
 
 COMMANDS_PER_PAGE = 6
 
-(
-    "💰 Economy",
-    [
-        (
-            "💼 /jobs",
-            "`View all available jobs and see how much each one pays.`",
-        ),
-        (
-            "👔 /work [job]",
-            "`Choose or switch jobs. Run /work without selecting a job to earn money. Cooldown: 8 hours.`",
-        ),
-        (
-            "🎰 /scatter [amount]",
-            "`Bet your money on a coin flip. Win big or lose everything.`",
-        ),
-        (
-            "🎤 /karaoke",
-            "`Sing karaoke and earn ₱100–₱1,000. Cooldown: 1 minute.`",
-        ),
-        (
-            "💵 /allowance",
-            "`Claim your allowance. Cooldown: 24 hours.`",
-        ),
-        (
-            "☀️ /daily",
-            "`Claim your daily reward.`",
-        ),
-        (
-            "📅 /weekly",
-            "`Claim your weekly reward.`",
-        ),
-        (
-            "🎉 /yearly",
-            "`Claim your yearly reward.`",
-        ),
-    ],
-),
+CATEGORIES = [
+    (
+        "💰 Economy",
+        [
+            (
+                "💼 /jobs",
+                "`View all available jobs and see how much each one pays.`",
+            ),
+            (
+                "👔 /work [job]",
+                "`Choose or switch jobs. Run /work without selecting a job to earn money. Cooldown: 8 hours.`",
+            ),
+            (
+                "🎰 /scatter [amount]",
+                "`Bet your money on a coin flip. Win big or lose everything.`",
+            ),
+            (
+                "🎤 /karaoke",
+                "`Sing karaoke and earn ₱100–₱1,000. Cooldown: 1 minute.`",
+            ),
+            (
+                "💵 /allowance",
+                "`Claim your allowance. Cooldown: 24 hours.`",
+            ),
+            (
+                "☀️ /daily",
+                "`Claim your daily reward.`",
+            ),
+            (
+                "📅 /weekly",
+                "`Claim your weekly reward.`",
+            ),
+            (
+                "🎉 /yearly",
+                "`Claim your yearly reward.`",
+            ),
+        ],
+    ),
+
+    (
+        "🛒 Shop & Inventory",
+        [
+            (
+                "🛍️ /shop",
+                "`Browse all items available in the shop.`",
+            ),
+            (
+                "💸 /buy [item]",
+                "`Purchase an item from the shop.`",
+            ),
+            (
+                "🎒 /inventory",
+                "`View all items you own.`",
+            ),
+            (
+                "🛡️ /use [item]",
+                "`Use an item from your inventory.`",
+            ),
+            (
+                "🔒 Padlock",
+                "`Protects you from /steal for 24 hours.`",
+            ),
+            (
+                "🎟️ Lottery Ticket",
+                "`Consumed automatically when you use /lottery join.`",
+            ),
+            (
+                "💰 /balance [user]",
+                "`Check your balance or another player's balance.`",
+            ),
+        ],
+    ),
+
+    (
+        "🎟️ Lottery",
+        [
+            (
+                "🎟️ /lottery info",
+                "`View the current lottery prize, tickets, and end time.`",
+            ),
+            (
+                "🎫 /lottery join [tickets]",
+                "`Join the lottery using your lottery tickets.`",
+            ),
+            (
+                "🏆 /lottery draw",
+                "`Owner-only command to draw the lottery winner.`",
+            ),
+            (
+                "➕ /create lottery",
+                "`Owner-only command to create a lottery.`",
+            ),
+        ],
+    ),
+
+    (
+        "🥷 Crime",
+        [
+            (
+                "🥷 /steal [user]",
+                "`Attempt to steal another player's money. Cooldown: 24 hours.`",
+            ),
+        ],
+    ),
+
+    (
+        "🏦 Loans",
+        [
+            (
+                "📨 /loan request",
+                "`Request a loan from another player.`",
+            ),
+            (
+                "💵 /loan pay",
+                "`Pay back part or all of a loan.`",
+            ),
+            (
+                "📒 /loan list",
+                "`View all active loans.`",
+            ),
+            (
+                "📄 /loan info",
+                "`See detailed information about a loan.`",
+            ),
+            (
+                "❌ /loan cancel",
+                "`Cancel a pending loan request.`",
+            ),
+        ],
+    ),
+
+    (
+        "💼 Businesses",
+        [
+            (
+                "📋 /business list",
+                "`View all businesses you can buy.`",
+            ),
+            (
+                "🛒 /business buy",
+                "`Purchase a business.`",
+            ),
+            (
+                "💰 /business sell",
+                "`Sell one of your businesses.`",
+            ),
+            (
+                "📊 /business portfolio",
+                "`View your businesses.`",
+            ),
+            (
+                "💵 /business collect",
+                "`Collect business income.`",
+            ),
+            (
+                "⬆️ /business upgrade",
+                "`Upgrade a business.`",
+            ),
+            (
+                "📈 /business stats",
+                "`See business statistics.`",
+            ),
+            (
+                "🏆 /business leaderboard",
+                "`View the richest business owners.`",
+            ),
+            (
+                "🏴‍☠️ /business raid",
+                "`Raid another player's business.`",
+            ),
+            (
+                "🛡️ /business defend",
+                "`Protect your businesses.`",
+            ),
+            (
+                "💥 /business bankrupt",
+                "`Close a business permanently.`",
+            ),
+        ],
+    ),
+
+    (
+        "📊 Rankings",
+        [
+            (
+                "🏆 /leaderboard",
+                "`View the richest players in the server.`",
+            ),
+        ],
+    ),
+
+    (
+        "ℹ️ Info",
+        [
+            (
+                "👤 /profile [user]",
+                "`View a player's profile.`",
+            ),
+            (
+                "📖 /help",
+                "`Open this help menu.`",
+            ),
+        ],
+    ),
 ]
+
 PAGES = []
 
 for category_name, category_commands in CATEGORIES:
