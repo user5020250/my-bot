@@ -340,121 +340,120 @@ class Social(commands.Cog):
         view.message = await interaction.original_response()
         self.pending_requests[request_id] = view
 
-    # ----------------------------------------------------------- /utang pay
+        # ----------------------------------------------------------- /utang pay
 
     @utang_group.command(
-    name="pay",
-    description="Pay a specific loan.",
-)
-@app_commands.describe(
-    loan_id="The loan ID to pay",
-    amount="How much to pay",
-)
-async def utang_pay(
-    self,
-    interaction: discord.Interaction,
-    loan_id: int,
-    amount: app_commands.Range[int, 1],
-):
-    borrower_id = str(interaction.user.id)
-
-    conn = get_conn()
-
-    loan = conn.execute(
-        """
-        SELECT *
-        FROM loans
-        WHERE id = ?
-        AND borrower = ?
-        AND status = 'active'
-        """,
-        (
-            loan_id,
-            borrower_id,
-        ),
-    ).fetchone()
-
-    if loan is None:
-        conn.close()
-
-        await interaction.response.send_message(
-            f"Walang active loan na may ID `{loan_id}`.",
-            ephemeral=True,
-        )
-        return
-
-    borrower_user = db.get_user(
-        borrower_id
+        name="pay",
+        description="Pay a specific loan.",
     )
-
-    pay_amount = min(
-        amount,
-        loan["remaining"],
-        borrower_user["balance"],
+    @app_commands.describe(
+        loan_id="The loan ID to pay",
+        amount="How much to pay",
     )
+    async def utang_pay(
+        self,
+        interaction: discord.Interaction,
+        loan_id: int,
+        amount: app_commands.Range[int, 1],
+    ):
+        borrower_id = str(interaction.user.id)
 
-    if pay_amount <= 0:
-        conn.close()
+        conn = get_conn()
 
-        await interaction.response.send_message(
-            "Wala kang sapat na pera.",
-            ephemeral=True,
-        )
-        return
-
-    new_remaining = loan["remaining"] - pay_amount
-
-    if new_remaining <= 0:
-        conn.execute(
+        loan = conn.execute(
             """
-            UPDATE loans
-            SET remaining = 0,
-                status = 'paid'
+            SELECT *
+            FROM loans
             WHERE id = ?
-            """,
-            (loan_id,),
-        )
-    else:
-        conn.execute(
-            """
-            UPDATE loans
-            SET remaining = ?
-            WHERE id = ?
+            AND borrower = ?
+            AND status = 'active'
             """,
             (
-                new_remaining,
                 loan_id,
+                borrower_id,
+            ),
+        ).fetchone()
+
+        if loan is None:
+            conn.close()
+
+            await interaction.response.send_message(
+                f"Walang active loan na may ID `{loan_id}`.",
+                ephemeral=True,
+            )
+            return
+
+        borrower_user = db.get_user(
+            borrower_id
+        )
+
+        pay_amount = min(
+            amount,
+            loan["remaining"],
+            borrower_user["balance"],
+        )
+
+        if pay_amount <= 0:
+            conn.close()
+
+            await interaction.response.send_message(
+                "Wala kang sapat na pera.",
+                ephemeral=True,
+            )
+            return
+
+        new_remaining = loan["remaining"] - pay_amount
+
+        if new_remaining <= 0:
+            conn.execute(
+                """
+                UPDATE loans
+                SET remaining = 0,
+                    status = 'paid'
+                WHERE id = ?
+                """,
+                (loan_id,),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE loans
+                SET remaining = ?
+                WHERE id = ?
+                """,
+                (
+                    new_remaining,
+                    loan_id,
+                ),
+            )
+
+        conn.commit()
+        conn.close()
+
+        db.add_balance(
+            borrower_id,
+            -pay_amount,
+        )
+
+        db.add_balance(
+            loan["lender"],
+            pay_amount,
+        )
+
+        embed = discord.Embed(
+            title="Bayad Utang",
+            color=WHITE,
+            description=(
+                f"Loan ID: `{loan_id}`\n"
+                f"Lender: <@{loan['lender']}>\n"
+                f"Paid: **{db.format_peso(pay_amount)}**\n"
+                f"Remaining: **{db.format_peso(new_remaining)}**"
             ),
         )
 
-    conn.commit()
-    conn.close()
-
-    db.add_balance(
-        borrower_id,
-        -pay_amount,
-    )
-
-    db.add_balance(
-        loan["lender"],
-        pay_amount,
-    )
-
-    embed = discord.Embed(
-        title="Bayad Utang",
-        color=WHITE,
-        description=(
-            f"Loan ID: `{loan_id}`\n"
-            f"Lender: <@{loan['lender']}>\n"
-            f"Paid: **{db.format_peso(pay_amount)}**\n"
-            f"Remaining: **{db.format_peso(new_remaining)}**"
-        ),
-    )
-
-    await interaction.response.send_message(
-        embed=embed
-    )
-
+        await interaction.response.send_message(
+            embed=embed
+        )
     # ---------------------------------------------------------- /utang list
 
     @utang_group.command(
