@@ -263,165 +263,153 @@ class Shop(commands.Cog):
             embed=embed
         )
 
-# ==========================
-# /buy
-# ==========================
+    # ==========================
+    # /buy
+    # ==========================
 
-@app_commands.command(
-    name="buy",
-    description="Buy an item.",
-)
-@app_commands.describe(
-    item="Item to buy",
-    qty="How many to buy",
-)
-async def buy(
-    self,
-    interaction: discord.Interaction,
-    item: str,
-    qty: int = 1,
-):
-    item = item.lower()
-
-    refresh_shop()
-
-    if qty <= 0:
-
-        await interaction.response.send_message(
-            "❌ Quantity must be greater than 0.",
-            ephemeral=True,
-        )
-        return
-
-    if item not in SHOP_ITEMS:
-
-        await interaction.response.send_message(
-            "❌ Item not found.",
-            ephemeral=True,
-        )
-        return
-
-    shop_item = SHOP_ITEMS[item]
-
-    stock = get_item_stock(item)
-
-    if stock <= 0:
-
-        await interaction.response.send_message(
-            "❌ This item is out of stock.",
-            ephemeral=True,
-        )
-        return
-
-    if qty > stock:
-
-        await interaction.response.send_message(
-            (
-                f"❌ There are only "
-                f"`{stock}` "
-                f"`{shop_item['name']}` left."
-            ),
-            ephemeral=True,
-        )
-        return
-
-    total_cost = shop_item["cost"] * qty
-
-    user_id = str(interaction.user.id)
-
-    user = db.get_user(user_id)
-
-    if user["balance"] < total_cost:
-
-        await interaction.response.send_message(
-            (
-                f"❌ You need "
-                f"`{db.format_peso(total_cost)}`.\n"
-                f"Current balance: "
-                f"`{db.format_peso(user['balance'])}`"
-            ),
-            ephemeral=True,
-        )
-        return
-
-    new_balance = db.add_balance(
-        user_id,
-        -total_cost,
+    @app_commands.command(
+        name="buy",
+        description="Buy an item.",
     )
-
-    db.add_inventory(
-        user_id,
-        item,
-        qty,
-        buy_price=shop_item["cost"],
+    @app_commands.describe(
+        item="Item to buy",
+        qty="How many to buy",
     )
+    async def buy(
+        self,
+        interaction: discord.Interaction,
+        item: str,
+        qty: app_commands.Range[int, 1] = 1,
+    ):
+        item = item.lower()
 
-    conn = get_conn()
+        refresh_shop()
 
-    conn.execute(
-        """
-        UPDATE shop_stock
-        SET stock = stock - ?
-        WHERE item = ?
-        """,
-        (
-            qty,
+        if item not in SHOP_ITEMS:
+            await interaction.response.send_message(
+                "❌ Item not found.",
+                ephemeral=True,
+            )
+            return
+
+        shop_item = SHOP_ITEMS[item]
+
+        stock = get_item_stock(item)
+
+        if stock <= 0:
+            await interaction.response.send_message(
+                "❌ This item is out of stock.",
+                ephemeral=True,
+            )
+            return
+
+        if qty > stock:
+            await interaction.response.send_message(
+                (
+                    f"❌ There are only "
+                    f"`{stock}` "
+                    f"`{shop_item['name']}` left."
+                ),
+                ephemeral=True,
+            )
+            return
+
+        total_cost = shop_item["cost"] * qty
+
+        user_id = str(interaction.user.id)
+
+        user = db.get_user(user_id)
+
+        if user["balance"] < total_cost:
+            await interaction.response.send_message(
+                (
+                    f"❌ You need "
+                    f"`{db.format_peso(total_cost)}`.\n"
+                    f"Current balance: "
+                    f"`{db.format_peso(user['balance'])}`"
+                ),
+                ephemeral=True,
+            )
+            return
+
+        new_balance = db.add_balance(
+            user_id,
+            -total_cost,
+        )
+
+        db.add_inventory(
+            user_id,
             item,
-        ),
-    )
+            qty,
+            buy_price=shop_item["cost"],
+        )
 
-    conn.commit()
-    conn.close()
+        conn = get_conn()
 
-    embed = discord.Embed(
-        title="🛒 Purchase Complete",
-        color=WHITE,
-    )
+        conn.execute(
+            """
+            UPDATE shop_stock
+            SET stock = stock - ?
+            WHERE item = ?
+            """,
+            (
+                qty,
+                item,
+            ),
+        )
 
-    embed.set_thumbnail(
-        url=interaction.user.display_avatar.url
-    )
+        conn.commit()
+        conn.close()
 
-    embed.add_field(
-        name="📦 Item",
-        value=(
-            f"{shop_item['emoji']} "
-            f"`{shop_item['name']}`"
-        ),
-        inline=True,
-    )
+        embed = discord.Embed(
+            title="🛒 Purchase Complete",
+            color=WHITE,
+        )
 
-    embed.add_field(
-        name="🔢 Quantity",
-        value=f"`{qty}`",
-        inline=True,
-    )
+        embed.set_thumbnail(
+            url=interaction.user.display_avatar.url
+        )
 
-    embed.add_field(
-        name="💸 Total Cost",
-        value=f"`{db.format_peso(total_cost)}`",
-        inline=True,
-    )
+        embed.add_field(
+            name="📦 Item",
+            value=(
+                f"{shop_item['emoji']} "
+                f"`{shop_item['name']}`"
+            ),
+            inline=True,
+        )
 
-    embed.add_field(
-        name="📉 Stock Left",
-        value=f"`{stock - qty}`",
-        inline=True,
-    )
+        embed.add_field(
+            name="🔢 Quantity",
+            value=f"`{qty}`",
+            inline=True,
+        )
 
-    embed.add_field(
-        name="💰 New Balance",
-        value=f"`{db.format_peso(new_balance)}`",
-        inline=False,
-    )
+        embed.add_field(
+            name="💸 Total Cost",
+            value=f"`{db.format_peso(total_cost)}`",
+            inline=True,
+        )
 
-    embed.set_footer(
-        text="Use /inventory to see your items."
-    )
+        embed.add_field(
+            name="📉 Stock Left",
+            value=f"`{stock - qty}`",
+            inline=True,
+        )
 
-    await interaction.response.send_message(
-        embed=embed
-    )
+        embed.add_field(
+            name="💰 New Balance",
+            value=f"`{db.format_peso(new_balance)}`",
+            inline=False,
+        )
+
+        embed.set_footer(
+            text="Use /inventory to see your items."
+        )
+
+        await interaction.response.send_message(
+            embed=embed
+        )
     
 async def setup(bot):
     await bot.add_cog(
