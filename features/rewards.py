@@ -5,6 +5,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from database import get_conn
 import db_utils as db
 
 WHITE = discord.Color(0xFFFFFF)
@@ -33,10 +34,58 @@ MONTHLY_MAX_AMOUNT = 20000
 YEARLY_MIN_AMOUNT = 150000
 YEARLY_MAX_AMOUNT = 300000
 
+# db_utils.check_cooldown/set_cooldown read and write these as real
+# columns on the `users` table (and only allow whitelisted field
+# names — make sure these are also added to _ALLOWED_COOLDOWN_FIELDS
+# in db_utils.py). This migration adds the columns themselves if an
+# existing database doesn't have them yet, so this cog works without
+# having to hand-edit database.py.
+REWARD_COOLDOWN_FIELDS = (
+    "last_daily",
+    "last_weekly",
+    "last_monthly",
+    "last_yearly",
+)
+
+
+def ensure_reward_columns():
+    conn = get_conn()
+
+    existing_cols = {
+        row["name"] for row in conn.execute("PRAGMA table_info(users)")
+    }
+
+    for field in REWARD_COOLDOWN_FIELDS:
+        if field not in existing_cols:
+            conn.execute(
+                f"ALTER TABLE users ADD COLUMN {field} INTEGER NOT NULL DEFAULT 0"
+            )
+
+    conn.commit()
+    conn.close()
+
 
 class Rewards(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        ensure_reward_columns()
+
+    async def cog_app_command_error(
+        self,
+        interaction: discord.Interaction,
+        error: app_commands.AppCommandError,
+    ):
+        # Without this, an unhandled exception here means Discord
+        # never gets a response and shows "The application did not
+        # respond" instead of a real error message.
+        print(f"[rewards] command error: {error!r}")
+
+        message = "May naganap na error. Subukan ulit mamaya."
+
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
 
     # ---------------------------------------------------------------- /daily
 
