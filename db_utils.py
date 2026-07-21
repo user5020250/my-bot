@@ -1,8 +1,7 @@
 """
 db_utils.py
 
-Small helper functions wrapping common reads/writes to the SQLite database.
-Every cog imports from here instead of touching SQL directly.
+Common helper functions for the economy database.
 """
 
 import time
@@ -24,11 +23,19 @@ _ALLOWED_COOLDOWN_FIELDS = {
 }
 
 
+# ==========================================================
+# USERS
+# ==========================================================
+
 def get_user(user_id: str) -> dict:
     conn = get_conn()
 
     row = conn.execute(
-        "SELECT * FROM users WHERE id = ?",
+        """
+        SELECT *
+        FROM users
+        WHERE id = ?
+        """,
         (user_id,),
     ).fetchone()
 
@@ -50,7 +57,11 @@ def get_user(user_id: str) -> dict:
         conn.commit()
 
         row = conn.execute(
-            "SELECT * FROM users WHERE id = ?",
+            """
+            SELECT *
+            FROM users
+            WHERE id = ?
+            """,
             (user_id,),
         ).fetchone()
 
@@ -59,7 +70,11 @@ def get_user(user_id: str) -> dict:
     return dict(row)
 
 
-def set_balance(user_id: str, amount) -> int:
+def set_balance(
+    user_id: str,
+    amount: int,
+) -> int:
+
     get_user(user_id)
 
     amount = max(
@@ -87,7 +102,11 @@ def set_balance(user_id: str, amount) -> int:
     return amount
 
 
-def add_balance(user_id: str, delta) -> int:
+def add_balance(
+    user_id: str,
+    delta: int,
+) -> int:
+
     user = get_user(user_id)
 
     return set_balance(
@@ -96,7 +115,11 @@ def add_balance(user_id: str, delta) -> int:
     )
 
 
-def set_job(user_id: str, job: str) -> None:
+def set_job(
+    user_id: str,
+    job: str,
+) -> None:
+
     get_user(user_id)
 
     conn = get_conn()
@@ -116,6 +139,10 @@ def set_job(user_id: str, job: str) -> None:
     conn.commit()
     conn.close()
 
+
+# ==========================================================
+# COOLDOWNS
+# ==========================================================
 
 def set_cooldown(
     user_id: str,
@@ -159,66 +186,25 @@ def check_cooldown(
             f"Unknown cooldown field: {field}"
         )
 
-    user = get_user(
-        user_id
-    )
+    user = get_user(user_id)
 
     last = user[field] or 0
 
-    now = int(
-        time.time()
-    )
+    now = int(time.time())
 
     remaining = cooldown_seconds - (
         now - last
     )
 
-    return (
-        remaining
-        if remaining > 0
-        else 0
+    return max(
+        0,
+        remaining,
     )
 
 
-def format_peso(amount) -> str:
-    return f"₱{amount:,.0f}"
-
-
-def format_duration(seconds) -> str:
-    seconds = int(seconds)
-
-    hrs, rem = divmod(
-        seconds,
-        3600,
-    )
-
-    mins, secs = divmod(
-        rem,
-        60,
-    )
-
-    parts = []
-
-    if hrs:
-        parts.append(
-            f"{hrs}h"
-        )
-
-    if mins:
-        parts.append(
-            f"{mins}m"
-        )
-
-    if secs and not hrs:
-        parts.append(
-            f"{secs}s"
-        )
-
-    return (
-        " ".join(parts)
-        or "0s"
-    )
-
+# ==========================================================
+# INVENTORY
+# ==========================================================
 
 def get_inventory(
     user_id: str,
@@ -256,12 +242,34 @@ def get_inventory_qty(
     item: str,
 ) -> int:
 
-    inventory = get_inventory(
+    return get_inventory(
         user_id,
         item,
-    )
+    )["qty"]
 
-    return inventory["qty"]
+
+def get_all_inventory(
+    user_id: str,
+) -> list:
+
+    conn = get_conn()
+
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM inventory
+        WHERE user_id = ?
+        ORDER BY item
+        """,
+        (user_id,),
+    ).fetchall()
+
+    conn.close()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def add_inventory(
@@ -276,13 +284,8 @@ def add_inventory(
         item,
     )
 
-    current_qty = inventory[
-        "qty"
-    ]
-
-    current_avg = inventory[
-        "avg_buy_price"
-    ]
+    current_qty = inventory["qty"]
+    current_avg = inventory["avg_buy_price"]
 
     new_qty = max(
         0,
@@ -294,12 +297,11 @@ def add_inventory(
     if (
         delta > 0
         and buy_price is not None
+        and new_qty > 0
     ):
         total_cost = (
-            current_qty
-            * current_avg
-            + delta
-            * buy_price
+            current_qty * current_avg
+            + delta * buy_price
         )
 
         new_avg = round(
@@ -321,7 +323,7 @@ def add_inventory(
         )
         VALUES (?, ?, ?, ?)
 
-        ON CONFLICT(
+        ON CONFLICT (
             user_id,
             item
         )
@@ -342,3 +344,60 @@ def add_inventory(
     conn.close()
 
     return new_qty
+
+
+# ==========================================================
+# FORMATTING
+# ==========================================================
+
+def format_peso(
+    amount: int,
+) -> str:
+
+    return f"₱{amount:,.0f}"
+
+
+def format_duration(
+    seconds: int,
+) -> str:
+
+    seconds = int(seconds)
+
+    days, seconds = divmod(
+        seconds,
+        86400,
+    )
+
+    hrs, seconds = divmod(
+        seconds,
+        3600,
+    )
+
+    mins, secs = divmod(
+        seconds,
+        60,
+    )
+
+    parts = []
+
+    if days:
+        parts.append(
+            f"{days}d"
+        )
+
+    if hrs:
+        parts.append(
+            f"{hrs}h"
+        )
+
+    if mins:
+        parts.append(
+            f"{mins}m"
+        )
+
+    if secs and days == 0 and hrs == 0:
+        parts.append(
+            f"{secs}s"
+        )
+
+    return " ".join(parts) or "0s"
