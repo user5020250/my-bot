@@ -2,98 +2,82 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-WHITE = discord.Color(0xFFFFFF)
+WHITE = discord.Color.white()
 COMMANDS_PER_PAGE = 5
 
 INTRO = (
-    "Starting money: **₱1,000**. Everything's in pesos (₱). Use the arrows below to "
-    "browse commands, or hit ✖ to close this menu whenever you're done. Let's get this bread."
+    "Starting money: **₱1,000**. Everything is in pesos (₱). "
+    "Use the buttons below to browse commands, or press ✖ to close this menu."
 )
 
 COMMANDS = [
     (
-        "💼 /jobs",
-        "See every job on the market and how much each one pays. No commitment, just vibes.",
+        "/jobs",
+        "View all available jobs and see how much each one pays.",
     ),
-    
     (
-        "👔 /trabaho job: <pick>",
-        "Pick or switch your job. Run `/trabaho` again with no `job` param to actually clock in "
-        "and get paid. Cooldown: 30 min.",
+        "/trabaho job: [job]",
+        "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 30 minutes.",
     ),
-    
     (
-        "🧢 /tambay",
-        "Hang out with the barkada for a shot at quick cash. 70% chance you win small, "
-        "30% chance it costs you (yosi, snacks, you know how it is). Cooldown: 1 min.",
+        "/tambay",
+        "Hang out with the barkada for a chance to earn some quick cash. "
+        "70% chance to win, 30% chance to lose money on snacks or yosi. Cooldown: 1 minute.",
     ),
-    
     (
-        "🎲 /sugal amount: <₱>",
-        "50/50 coinflip bet. Go big or go broke — no limit on the bet, no cooldown either.",
+        "/sugal amount: [₱]",
+        "Flip a coin and bet your money. Win big or lose everything. No cooldown.",
     ),
-    
     (
-        "🥬 /palengke presyo",
-        "Check today's prices for rice, fish, mangoes, chicken, meat, and veggies. "
-        "Prices shift every few hours, stay updated.",
+        "/palengke presyo",
+        "Check the latest prices for rice, fish, mangoes, chicken, meat, and vegetables.",
     ),
-    
     (
-        "🛒 /palengke bili item: <pick> quantity: <n>",
-        "Buy goods from the palengke to stock up or flip later.",
+        "/palengke bili item: [item] quantity: [amount]",
+        "Buy items from the palengke to keep or resell later.",
     ),
-    
     (
-        "💵 /palengke benta item: <pick> quantity: <n>",
-        "Sell whatever you bought. Buy low, sell high, that's the whole game.",
+        "/palengke benta item: [item] quantity: [amount]",
+        "Sell the items you own and make a profit.",
     ),
-    
     (
-        "📱 /load bili quantity: <n>",
-        "Buy mobile load in bulk to resell at a markup later.",
+        "/load bili quantity: [amount]",
+        "Buy mobile load in bulk.",
     ),
-    
     (
-        "📲 /load benta quantity: <n>",
-        "Resell your load. Profit's random — could be cha-ching, could be a flop.",
+        "/load benta quantity: [amount]",
+        "Resell your mobile load for a random profit.",
     ),
-    
     (
-        "🤝 /utang lender:<@user> amount: <₱>",
-        "Borrow cash from another player. No cooldown, but don't be that friend who ghosts on payback.",
+        "/utang lender: [user] amount: [₱]",
+        "Borrow money from another player.",
     ),
-    
     (
-        "💸 /bayad lender:<@user> amount: <₱>",
-        "Pay back what you owe. Do it before it gets awkward.",
+        "/bayad lender: [user] amount: [₱]",
+        "Pay back your debt.",
     ),
-    
     (
-        "🎭 /budol target: <@user>",
-        "Attempt to scam someone. Big payout if it works, real penalty if you get caught. "
-        "Cooldown: 1 day. High risk, high reward, act accordingly.",
+        "/budol target: [user]",
+        "Try to scam another player. High risk, high reward. Cooldown: 1 day.",
     ),
-    
     (
-        "🎤 /karaoke",
-        "Sing for tips, ₱50-₱500. Confidence not required. Cooldown: 5 min.",
+        "/karaoke",
+        "Sing for tips and earn ₱50–₱500. Cooldown: 5 minutes.",
     ),
-    
     (
-        "🎒 /baon",
-        "Claim your daily allowance, ₱50-₱100. Cooldown: 24 hrs, don't be greedy.",
+        "/baon",
+        "Claim your daily allowance of ₱50–₱100. Cooldown: 24 hours.",
     ),
-    
     (
-        "🪪 /profile user: <@user>",
-        "Check your (or someone else's) balance, job, and cooldown status at a glance. "
-        "Leave `user` blank to check yourself.",
+        "/profile user: [user]",
+        "View your profile or another player's balance, job, and cooldowns.",
     ),
 ]
 
-# Chunk into pages of 5 commands each.
-PAGES = [COMMANDS[i : i + COMMANDS_PER_PAGE] for i in range(0, len(COMMANDS), COMMANDS_PER_PAGE)]
+PAGES = [
+    COMMANDS[i:i + COMMANDS_PER_PAGE]
+    for i in range(0, len(COMMANDS), COMMANDS_PER_PAGE)
+]
 
 
 class HelpView(discord.ui.View):
@@ -105,63 +89,121 @@ class HelpView(discord.ui.View):
 
     def make_embed(self) -> discord.Embed:
         page = PAGES[self.index]
+
         embed = discord.Embed(
             title="Commands",
             description=INTRO if self.index == 0 else None,
             color=WHITE,
         )
+
         for name, desc in page:
-            embed.add_field(name=name, value=desc, inline=False)
-        embed.set_footer(text=f"Page {self.index + 1}/{len(PAGES)} • Pinoy Economy Bot")
+            embed.add_field(
+                name=name,
+                value=desc,
+                inline=False,
+            )
+
+            embed.add_field(
+                name="\u200b",
+                value="\u200b",
+                inline=False,
+            )
+
+        embed.set_footer(
+            text=f"Page {self.index + 1}/{len(PAGES)} • Pinoy Economy Bot"
+        )
+
         return embed
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(
+        self,
+        interaction: discord.Interaction,
+    ) -> bool:
         if interaction.user.id != self.author_id:
             await interaction.response.send_message(
-                "This isn't your menu bestie, run `/help` yourself 👀", ephemeral=True
+                "This menu belongs to someone else. Run `/help` to open your own.",
+                ephemeral=True,
             )
             return False
+
         return True
 
     async def on_timeout(self) -> None:
         for child in self.children:
             child.disabled = True
+
         if self.message:
             try:
                 await self.message.edit(view=self)
             except discord.HTTPException:
                 pass
 
-    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
-    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(
+        label="◀",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def previous(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
         self.index = (self.index - 1) % len(PAGES)
-        await interaction.response.edit_message(embed=self.make_embed(), view=self)
 
-    @discord.ui.button(label="✖", style=discord.ButtonStyle.danger)
-    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
-        for child in self.children:
-            child.disabled = True
         await interaction.response.edit_message(
-            content="Help menu closed. Pull it up again anytime with `/help`.",
+            embed=self.make_embed(),
+            view=self,
+        )
+
+    @discord.ui.button(
+        label="✖",
+        style=discord.ButtonStyle.danger,
+    )
+    async def close(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        self.stop()
+
+        await interaction.response.edit_message(
+            content="Help menu closed. Run `/help` to open it again.",
             embed=None,
             view=None,
         )
-        self.stop()
 
-    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
-    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(
+        label="▶",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def next(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
         self.index = (self.index + 1) % len(PAGES)
-        await interaction.response.edit_message(embed=self.make_embed(), view=self)
+
+        await interaction.response.edit_message(
+            embed=self.make_embed(),
+            view=self,
+        )
 
 
 class Help(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="help", description="Browse all commands and how to use them.")
+    @app_commands.command(
+        name="help",
+        description="Browse all commands and learn how to use them.",
+    )
     async def help(self, interaction: discord.Interaction):
         view = HelpView(interaction.user.id)
-        await interaction.response.send_message(embed=view.make_embed(), view=view)
+
+        await interaction.response.send_message(
+            embed=view.make_embed(),
+            view=view,
+        )
+
         view.message = await interaction.original_response()
 
 
