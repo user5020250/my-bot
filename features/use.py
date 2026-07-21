@@ -130,56 +130,6 @@ class Use(commands.Cog):
 
             return
 
-        # =========================
-        # LOTTERY TICKET
-        # =========================
-
-        if item == "lottery_ticket":
-
-            success = db.join_lottery(
-                user_id,
-                1,
-            )
-
-            if not success:
-
-                await interaction.response.send_message(
-                    "❌ Failed to enter the lottery.",
-                    ephemeral=True,
-                )
-
-                return
-
-            entries = db.get_lottery_entries()
-
-            your_tickets = 0
-
-            for entry in entries:
-                if entry["user_id"] == user_id:
-                    your_tickets = entry["tickets"]
-                    break
-
-            embed = discord.Embed(
-                title="🎟️ Lottery Entry",
-                color=WHITE,
-            )
-
-            embed.add_field(
-                name="Tickets Entered",
-                value=f"`{your_tickets}`",
-                inline=False,
-            )
-
-            embed.set_footer(
-                text="Wait for the owner to draw the lottery."
-            )
-
-            await interaction.response.send_message(
-                embed=embed
-            )
-
-            return
-
         await interaction.response.send_message(
             "❌ This item cannot be used.",
             ephemeral=True,
