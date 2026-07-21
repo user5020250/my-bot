@@ -19,14 +19,14 @@ COGS = [
     "cogs.server",
     "cogs.message",
     "cogs.role",
-    "features.economy",   # NEW: /jobs /trabaho /tambay /sugal /baon
-    "features.social",    # NEW: /utang /bayad /budol /karaoke
+    "features.economy",   # NEW: /jobs /work /tambay /scatter /allowance
+    "features.loan",    # NEW: /loan
     "features.admin",     # NEW: /give
     "features.help",      # NEW: /help
     "features.inventory", # NEW: /inventory
     "features.sideline", # NEW: /sideline
     "features.profile", # NEW: /profile
-    "features.business",
+    "features.business", 
     "features.rewards",
     "features.leaderboard",
     "features.steal",
