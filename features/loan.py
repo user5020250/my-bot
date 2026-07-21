@@ -11,6 +11,27 @@ import db_utils as db
 
 WHITE = discord.Color(0xFFFFFF)
 
+def parse_amount(amount: str) -> int:
+    amount = amount.lower().replace(",", "").strip()
+
+    multipliers = {
+        "k": 1_000,
+        "m": 1_000_000,
+        "b": 1_000_000_000,
+        "t": 1_000_000_000_000,
+    }
+
+    if amount == "all":
+        return -1
+
+    suffix = amount[-1]
+
+    if suffix in multipliers:
+        number = float(amount[:-1])
+        return int(number * multipliers[suffix])
+
+    return int(amount)
+
 # ------------------------------------------------------------------ /loan
 
 LOAN_INTEREST_RATE = 0.20
@@ -359,246 +380,295 @@ class Social(commands.Cog):
         description="💰 Loan system.",
     )
 
-    # ------------------------------------------------------- /loan request
+   # ------------------------------------------------------- /loan request
 
-    @utang_group.command(
-        name="request",
-        description="Request a loan from another player.",
-    )
-    @app_commands.describe(
-        lender="Who you're borrowing from",
-        amount="How much to borrow",
-    )
-    async def utang_request(
-        self,
-        interaction: discord.Interaction,
-        lender: discord.Member,
-        amount: app_commands.Range[int, 1],
-    ):
-        borrower = interaction.user
-        borrower_id = str(borrower.id)
-        lender_id = str(lender.id)
+@utang_group.command(
+    name="request",
+    description="Request a loan from another player.",
+)
+@app_commands.describe(
+    lender="Who you're borrowing from",
+    amount="How much to borrow",
+)
+async def utang_request(
+    self,
+    interaction: discord.Interaction,
+    lender: discord.Member,
+    amount: str,
+):
+    borrower = interaction.user
+    borrower_id = str(borrower.id)
+    lender_id = str(lender.id)
 
-        if lender_id == borrower_id:
-            await interaction.response.send_message(
-                "🚫 You can't borrow from yourself."
-            )
-            return
-
-        if lender.bot:
-            await interaction.response.send_message(
-                "🤖 Bots don't lend money."
-            )
-            return
-
-        conn = get_conn()
-
-        active_loans = conn.execute(
-            """
-            SELECT *
-            FROM loans
-            WHERE borrower = ?
-            AND status = 'active'
-            """,
-            (borrower_id,),
-        ).fetchall()
-
-        overdue_loans = []
-
-        for loan_row in active_loans:
-            loan_row = escalate_if_overdue(conn, loan_row)
-
-            if is_overdue(loan_row):
-                overdue_loans.append(loan_row)
-
-        conn.close()
-
-        if overdue_loans:
-            lines = [
-                f"`{l['id']}`: **{db.format_peso(l['remaining'])}** owed to "
-                f"<@{l['lender']}> — overdue <t:{l['due_date']}:R>, "
-                f"escalated {l['overdue_count']}x "
-                f"(current penalty rate: {current_penalty_rate(l['overdue_count']) * 100:.0f}%)"
-                for l in overdue_loans
-            ]
-
-            await interaction.response.send_message(
-                "🚫 You can't take out a loan, you still have overdue loans:\n"
-                + "\n".join(lines)
-                + "\n\nPay them off first with `/loan pay` — "
-                "the interest keeps climbing the longer you wait.",
-                ephemeral=True,
-            )
-            return
-
-        principal = int(amount)
-        total_due = round(principal * (1 + LOAN_INTEREST_RATE))
-        due_dt = datetime.now(timezone.utc) + timedelta(days=LOAN_DUE_DAYS)
-        due_ts = int(due_dt.timestamp())
-
-        request_id = self._next_request_id
-        self._next_request_id += 1
-
-        view = LoanRequestView(
-            cog=self,
-            request_id=request_id,
-            borrower=borrower,
-            lender=lender,
-            principal=principal,
-            total_due=total_due,
-            due_ts=due_ts,
+    if lender_id == borrower_id:
+        await interaction.response.send_message(
+            "🚫 You can't borrow from yourself.",
+            ephemeral=True,
         )
+        return
 
-        embed = discord.Embed(
-            title="💸 Loan Request",
-            description=(
-                f"Borrower: {borrower.mention}\n"
-                f"Amount: **{db.format_peso(principal)}**\n"
-                f"Repayment: **{db.format_peso(total_due)}** "
-                f"({int(LOAN_INTEREST_RATE * 100)}% interest)\n"
-                f"Due: <t:{due_ts}:D>"
-            ),
-            color=WHITE,
+    if lender.bot:
+        await interaction.response.send_message(
+            "🤖 Bots don't lend money.",
+            ephemeral=True,
         )
+        return
 
-        embed.set_footer(
-            text=f"⏳ Expires in {LOAN_REQUEST_TIMEOUT_SECONDS} seconds"
+    try:
+        principal = db.parse_amount(amount)
+    except ValueError:
+        await interaction.response.send_message(
+            "❌ Invalid amount.\n"
+            "Examples: `1k`, `500k`, `2m`, `1b`, `1t`.",
+            ephemeral=True,
         )
+        return
+
+    if principal <= 0:
+        await interaction.response.send_message(
+            "❌ Amount must be greater than 0.",
+            ephemeral=True,
+        )
+        return
+
+    conn = get_conn()
+
+    active_loans = conn.execute(
+        """
+        SELECT *
+        FROM loans
+        WHERE borrower = ?
+        AND status = 'active'
+        """,
+        (borrower_id,),
+    ).fetchall()
+
+    overdue_loans = []
+
+    for loan_row in active_loans:
+        loan_row = escalate_if_overdue(conn, loan_row)
+
+        if is_overdue(loan_row):
+            overdue_loans.append(loan_row)
+
+    conn.close()
+
+    if overdue_loans:
+        lines = [
+            (
+                f"`{loan['id']}`: "
+                f"**{db.format_peso(loan['remaining'])}** "
+                f"owed to <@{loan['lender']}> "
+                f"— overdue <t:{loan['due_date']}:R>\n"
+                f"Escalated: {loan['overdue_count']}x "
+                f"({current_penalty_rate(loan['overdue_count']) * 100:.0f}% penalty)"
+            )
+            for loan in overdue_loans
+        ]
 
         await interaction.response.send_message(
-            content=lender.mention,
-            embed=embed,
-            view=view,
+            "🚫 You still have overdue loans:\n\n"
+            + "\n\n".join(lines)
+            + "\n\nPay them first using `/loan pay`.",
+            ephemeral=True,
         )
+        return
 
-        view.message = await interaction.original_response()
-        self.pending_requests[request_id] = view
-
-        # ------------------------------------------------------- /loan pay
-
-    @utang_group.command(
-        name="pay",
-        description="Pay a specific loan.",
+    total_due = round(
+        principal * (1 + LOAN_INTEREST_RATE)
     )
-    @app_commands.describe(
-        loan_id="The loan ID to pay",
-        amount="How much to pay",
+
+    due_dt = (
+        datetime.now(timezone.utc)
+        + timedelta(days=LOAN_DUE_DAYS)
     )
-    async def utang_pay(
-        self,
-        interaction: discord.Interaction,
-        loan_id: int,
-        amount: app_commands.Range[int, 1],
-    ):
-        borrower_id = str(interaction.user.id)
 
-        conn = get_conn()
+    due_ts = int(
+        due_dt.timestamp()
+    )
 
-        loan = conn.execute(
+    request_id = self._next_request_id
+    self._next_request_id += 1
+
+    view = LoanRequestView(
+        cog=self,
+        request_id=request_id,
+        borrower=borrower,
+        lender=lender,
+        principal=principal,
+        total_due=total_due,
+        due_ts=due_ts,
+    )
+
+    embed = discord.Embed(
+        title="💸 Loan Request",
+        color=WHITE,
+        description=(
+            f"👤 Borrower: {borrower.mention}\n"
+            f"💰 Amount: **{db.format_peso(principal)}**\n"
+            f"📈 Repayment: **{db.format_peso(total_due)}** "
+            f"({int(LOAN_INTEREST_RATE * 100)}% interest)\n"
+            f"📅 Due: <t:{due_ts}:D>"
+        ),
+    )
+
+    embed.set_footer(
+        text=(
+            f"Request ID: {request_id} • "
+            f"Expires in {LOAN_REQUEST_TIMEOUT_SECONDS} seconds"
+        )
+    )
+
+    await interaction.response.send_message(
+        content=lender.mention,
+        embed=embed,
+        view=view,
+    )
+
+    view.message = await interaction.original_response()
+
+    self.pending_requests[request_id] = view
+
+       # ------------------------------------------------------- /loan pay
+
+@utang_group.command(
+    name="pay",
+    description="Pay a specific loan.",
+)
+@app_commands.describe(
+    loan_id="The loan ID to pay",
+    amount="How much to pay",
+)
+async def utang_pay(
+    self,
+    interaction: discord.Interaction,
+    loan_id: int,
+    amount: str,
+):
+    borrower_id = str(interaction.user.id)
+
+    try:
+        amount = db.parse_amount(amount)
+    except ValueError:
+        await interaction.response.send_message(
+            "❌ Invalid amount.\n"
+            "Examples: `1k`, `500k`, `2m`, `1b`, `1t`.",
+            ephemeral=True,
+        )
+        return
+
+    conn = get_conn()
+
+    loan = conn.execute(
+        """
+        SELECT *
+        FROM loans
+        WHERE id = ?
+        AND borrower = ?
+        AND status = 'active'
+        """,
+        (
+            loan_id,
+            borrower_id,
+        ),
+    ).fetchone()
+
+    if loan is None:
+        conn.close()
+
+        await interaction.response.send_message(
+            f"❌ No active loan found with ID `{loan_id}`.",
+            ephemeral=True,
+        )
+        return
+
+    loan = escalate_if_overdue(conn, loan)
+
+    borrower_user = db.get_user(
+        borrower_id
+    )
+
+    pay_amount = min(
+        amount,
+        loan["remaining"],
+        borrower_user["balance"],
+    )
+
+    if pay_amount <= 0:
+        conn.close()
+
+        await interaction.response.send_message(
+            "💸 You don't have enough money.",
+            ephemeral=True,
+        )
+        return
+
+    new_remaining = loan["remaining"] - pay_amount
+
+    if new_remaining <= 0:
+        conn.execute(
             """
-            SELECT *
-            FROM loans
+            UPDATE loans
+            SET remaining = 0,
+                status = 'paid'
             WHERE id = ?
-            AND borrower = ?
-            AND status = 'active'
+            """,
+            (loan_id,),
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE loans
+            SET remaining = ?
+            WHERE id = ?
             """,
             (
+                new_remaining,
                 loan_id,
-                borrower_id,
             ),
-        ).fetchone()
-
-        if loan is None:
-            conn.close()
-
-            await interaction.response.send_message(
-                f"❌ No active loan found with ID `{loan_id}`.",
-                ephemeral=True,
-            )
-            return
-
-        loan = escalate_if_overdue(conn, loan)
-
-        borrower_user = db.get_user(
-            borrower_id
         )
 
-        pay_amount = min(
-            amount,
-            loan["remaining"],
-            borrower_user["balance"],
+    conn.commit()
+    conn.close()
+
+    db.add_balance(
+        borrower_id,
+        -pay_amount,
+    )
+
+    db.add_balance(
+        loan["lender"],
+        pay_amount,
+    )
+
+    description = (
+        f"🏦 Loan ID: `{loan_id}`\n"
+        f"👤 Lender: <@{loan['lender']}>\n"
+        f"💵 Paid: **{db.format_peso(pay_amount)}**\n"
+        f"💰 Remaining: **{db.format_peso(new_remaining)}**"
+    )
+
+    if new_remaining <= 0:
+        description += (
+            "\n\n✅ This loan has been fully paid."
         )
 
-        if pay_amount <= 0:
-            conn.close()
-
-            await interaction.response.send_message(
-                "💸 You don't have enough money.",
-                ephemeral=True,
-            )
-            return
-
-        new_remaining = loan["remaining"] - pay_amount
-
-        if new_remaining <= 0:
-            conn.execute(
-                """
-                UPDATE loans
-                SET remaining = 0,
-                    status = 'paid'
-                WHERE id = ?
-                """,
-                (loan_id,),
-            )
-        else:
-            conn.execute(
-                """
-                UPDATE loans
-                SET remaining = ?
-                WHERE id = ?
-                """,
-                (
-                    new_remaining,
-                    loan_id,
-                ),
-            )
-
-        conn.commit()
-        conn.close()
-
-        db.add_balance(
-            borrower_id,
-            -pay_amount,
+    elif loan["overdue_count"] > 0:
+        description += (
+            f"\n\n⚠️ This loan has been escalated "
+            f"{loan['overdue_count']}x due to late payment."
+            "\nInterest will continue increasing until it is paid."
         )
 
-        db.add_balance(
-            loan["lender"],
-            pay_amount,
-        )
+    embed = discord.Embed(
+        title="💵 Loan Payment",
+        description=description,
+        color=WHITE,
+    )
 
-        description = (
-            f"Loan ID: `{loan_id}`\n"
-            f"Lender: <@{loan['lender']}>\n"
-            f"Paid: **{db.format_peso(pay_amount)}**\n"
-            f"Remaining: **{db.format_peso(new_remaining)}**"
-        )
-
-        if loan["overdue_count"] > 0 and new_remaining > 0:
-            description += (
-                f"\n\n⚠️ This loan has been escalated "
-                f"{loan['overdue_count']}x due to late payment. "
-                f"If it's still not paid off, interest will keep climbing."
-            )
-
-        embed = discord.Embed(
-            title="💵 Loan Payment",
-            color=WHITE,
-            description=description,
-        )
-
-        await interaction.response.send_message(
-            embed=embed
-        )
+    await interaction.response.send_message(
+        embed=embed
+    )
     # ---------------------------------------------------------- /loan list
 
     @utang_group.command(
