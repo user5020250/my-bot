@@ -4,6 +4,8 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from database import init_db  # NEW: sets up the persistent SQLite database
+
 load_dotenv()  # reads variables from a local .env file
 
 intents = discord.Intents.default()
@@ -17,7 +19,10 @@ COGS = [
     "cogs.server",
     "cogs.message",
     "cogs.role",
-    "cogs.corruption",
+    "cogs.economy",   # NEW: /jobs /trabaho /tambay /sugal /baon
+    "cogs.market",    # NEW: /palengke /load
+    "cogs.social",    # NEW: /utang /bayad /budol /karaoke
+    "cogs.help",      # NEW: /help
 ]
 
 
@@ -35,6 +40,8 @@ async def main():
     token = os.getenv("DISCORD_TOKEN")
     if not token:
         raise RuntimeError("DISCORD_TOKEN environment variable is not set")
+
+    init_db()  # NEW: creates data/economy.db (or DATA_DIR) if it doesn't exist yet
 
     async with bot:
         for cog in COGS:
