@@ -21,6 +21,10 @@ class Lottery(commands.Cog):
         description="Lottery commands.",
     )
 
+    # ==========================
+    # /lottery setchannel
+    # ==========================
+
     @lottery_group.command(
         name="setchannel",
         description="Set the lottery announcement channel.",
@@ -39,8 +43,18 @@ class Lottery(commands.Cog):
         )
 
         await interaction.response.send_message(
-            f"✅ Lottery announcements will be sent to {channel.mention}."
+            (
+                "✅ Lottery announcements "
+                f"will be sent to {channel.mention}."
+            )
         )
+
+    # ==========================
+    # !createlottery
+    # Usage:
+    # !createlottery 1m 1d
+    # !createlottery 500k 12h
+    # ==========================
 
     @commands.command(
         name="createlottery",
@@ -49,8 +63,7 @@ class Lottery(commands.Cog):
         self,
         ctx: commands.Context,
         prize: str,
-        duration: int,
-        unit: str,
+        duration: str,
     ):
         if ctx.author.id != OWNER_ID:
             return
@@ -61,46 +74,67 @@ class Lottery(commands.Cog):
             )
 
         except ValueError:
+
             await ctx.send(
                 "❌ Invalid amount.\n"
-                "Examples: `500k`, `2m`, `1b`."
-            )
-            return
-
-        if duration <= 0:
-            await ctx.send(
-                "❌ Duration must be greater than 0."
+                "Examples:\n"
+                "`500k`\n"
+                "`2m`\n"
+                "`1b`"
             )
             return
 
         if db.get_lottery() is not None:
+
             await ctx.send(
                 "❌ There is already an active lottery."
             )
             return
 
+        duration = duration.lower()
+
         multipliers = {
-            "second": 1,
-            "seconds": 1,
-            "minute": 60,
-            "minutes": 60,
-            "hour": 3600,
-            "hours": 3600,
-            "day": 86400,
-            "days": 86400,
+            "s": 1,
+            "m": 60,
+            "h": 3600,
+            "d": 86400,
         }
 
-        unit = unit.lower()
+        unit = duration[-1]
 
         if unit not in multipliers:
+
             await ctx.send(
-                "❌ Invalid time unit.\n"
-                "Use: seconds, minutes, hours, or days."
+                "❌ Invalid duration.\n"
+                "Examples:\n"
+                "`30s`\n"
+                "`15m`\n"
+                "`12h`\n"
+                "`1d`"
+            )
+            return
+
+        try:
+            amount = int(
+                duration[:-1]
+            )
+
+        except ValueError:
+
+            await ctx.send(
+                "❌ Invalid duration."
+            )
+            return
+
+        if amount <= 0:
+
+            await ctx.send(
+                "❌ Duration must be greater than 0."
             )
             return
 
         ends_at = int(time.time()) + (
-            duration * multipliers[unit]
+            amount * multipliers[unit]
         )
 
         db.create_lottery(
@@ -111,9 +145,12 @@ class Lottery(commands.Cog):
         embed = discord.Embed(
             title="🎟️ New Lottery",
             description=(
-                f"💰 Prize: **{db.format_peso(prize)}**\n"
-                f"⏳ Ends: <t:{ends_at}:R>\n\n"
-                f"Use `/lottery join` to enter."
+                f"💰 Prize: "
+                f"**{db.format_peso(prize)}**\n"
+                f"⏳ Ends: "
+                f"<t:{ends_at}:R>\n\n"
+                f"Use `/lottery join` "
+                f"to enter."
             ),
             color=WHITE,
         )
@@ -132,6 +169,7 @@ class Lottery(commands.Cog):
                 continue
 
             try:
+
                 await channel.send(
                     embed=embed
                 )
@@ -146,6 +184,10 @@ class Lottery(commands.Cog):
             "✅ Lottery created."
         )
 
+    # ==========================
+    # /lottery info
+    # ==========================
+
     @lottery_group.command(
         name="info",
         description="View the current lottery.",
@@ -157,6 +199,7 @@ class Lottery(commands.Cog):
         lottery = db.get_lottery()
 
         if lottery is None:
+
             await interaction.response.send_message(
                 "❌ No active lottery.",
                 ephemeral=True,
@@ -170,12 +213,31 @@ class Lottery(commands.Cog):
             for entry in entries
         )
 
+        now = int(
+            time.time()
+        )
+
+        if lottery["ends_at"] <= now:
+
+            status_text = (
+                "❌ Lottery Ended"
+            )
+
+        else:
+
+            status_text = (
+                f"⏳ Ends: "
+                f"<t:{lottery['ends_at']}:R>"
+            )
+
         embed = discord.Embed(
             title="🎟️ Current Lottery",
             description=(
-                f"💰 Prize: **{db.format_peso(lottery['prize'])}**\n"
-                f"🎫 Total Tickets: **{total_tickets:,}**\n"
-                f"⏳ Ends: <t:{lottery['ends_at']}:R>"
+                f"💰 Prize: "
+                f"**{db.format_peso(lottery['prize'])}**\n"
+                f"🎫 Total Tickets: "
+                f"**{total_tickets:,}**\n"
+                f"{status_text}"
             ),
             color=WHITE,
         )
@@ -183,6 +245,10 @@ class Lottery(commands.Cog):
         await interaction.response.send_message(
             embed=embed
         )
+
+    # ==========================
+    # /lottery join
+    # ==========================
 
     @lottery_group.command(
         name="join",
@@ -199,6 +265,7 @@ class Lottery(commands.Cog):
         lottery = db.get_lottery()
 
         if lottery is None:
+
             await interaction.response.send_message(
                 "❌ No active lottery.",
                 ephemeral=True,
@@ -206,6 +273,7 @@ class Lottery(commands.Cog):
             return
 
         if tickets <= 0:
+
             await interaction.response.send_message(
                 "❌ Invalid ticket amount.",
                 ephemeral=True,
@@ -213,11 +281,14 @@ class Lottery(commands.Cog):
             return
 
         success = db.join_lottery(
-            str(interaction.user.id),
+            str(
+                interaction.user.id
+            ),
             tickets,
         )
 
         if not success:
+
             await interaction.response.send_message(
                 "❌ You don't have enough lottery tickets.",
                 ephemeral=True,
@@ -225,11 +296,21 @@ class Lottery(commands.Cog):
             return
 
         await interaction.response.send_message(
-            f"🎟️ You joined with **{tickets}** ticket(s)."
+            (
+                "🎟️ You joined with "
+                f"**{tickets}** ticket(s)."
+            )
         )
+
+    # ==========================
+    # !drawlottery
+    # ==========================
 
     @commands.command(
         name="drawlottery",
+        aliases=[
+            "lotterydraw",
+        ],
     )
     async def draw_lottery(
         self,
@@ -241,6 +322,7 @@ class Lottery(commands.Cog):
         lottery = db.get_lottery()
 
         if lottery is None:
+
             await ctx.send(
                 "❌ No active lottery."
             )
@@ -249,6 +331,7 @@ class Lottery(commands.Cog):
         entries = db.get_lottery_entries()
 
         if not entries:
+
             db.end_lottery()
 
             await ctx.send(
@@ -259,6 +342,7 @@ class Lottery(commands.Cog):
         pool = []
 
         for entry in entries:
+
             pool.extend(
                 [entry["user_id"]]
                 * entry["tickets"]
@@ -282,7 +366,9 @@ class Lottery(commands.Cog):
 
         embed.add_field(
             name="Winner",
-            value=f"<@{winner_id}>",
+            value=(
+                f"<@{winner_id}>"
+            ),
             inline=False,
         )
 
@@ -308,6 +394,7 @@ class Lottery(commands.Cog):
                 continue
 
             try:
+
                 await channel.send(
                     embed=embed
                 )
@@ -323,14 +410,19 @@ class Lottery(commands.Cog):
         )
 
 
-async def setup(bot):
-    cog = Lottery(bot)
+async def setup(
+    bot,
+):
+    cog = Lottery(
+        bot
+    )
 
     await bot.add_cog(
         cog
     )
 
     try:
+
         bot.tree.add_command(
             cog.lottery_group
         )
