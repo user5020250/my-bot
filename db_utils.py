@@ -17,6 +17,10 @@ _ALLOWED_COOLDOWN_FIELDS = {
     "last_budol",
     "last_baon",
     "last_karaoke",
+    "last_daily",
+    "last_weekly",
+    "last_monthly",
+    "last_yearly",
 }
 
 
