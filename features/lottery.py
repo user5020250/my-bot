@@ -61,18 +61,43 @@ class Lottery(commands.Cog):
         description="Create a lottery."
     )
     @app_commands.describe(
-        prize="Lottery prize",
+        prize="Lottery prize (500k, 1m, 2b)",
         hours="How many hours before it ends"
     )
     async def create_lottery(
         self,
         interaction: discord.Interaction,
-        prize: int,
+        prize: str,
         hours: int,
     ):
         if interaction.user.id != OWNER_ID:
             await interaction.response.send_message(
                 "❌ Owner only.",
+                ephemeral=True
+            )
+            return
+
+        try:
+            prize = db.parse_money(prize)
+
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Invalid amount.\n"
+                "Examples: `500k`, `2m`, `1b`.",
+                ephemeral=True
+            )
+            return
+
+        if prize <= 0:
+            await interaction.response.send_message(
+                "❌ Prize must be greater than 0.",
+                ephemeral=True
+            )
+            return
+
+        if hours <= 0:
+            await interaction.response.send_message(
+                "❌ Hours must be greater than 0.",
                 ephemeral=True
             )
             return
@@ -209,7 +234,11 @@ class Lottery(commands.Cog):
             lottery["prize"]
         )
 
-        db.clear_lottery_entries()
+        conn.execute(
+            """
+            DELETE FROM lottery_entries
+            """
+        )
 
         conn.execute(
             """
