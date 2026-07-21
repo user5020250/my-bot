@@ -17,7 +17,7 @@ COMMANDS = [
     ),
     (
         "/trabaho job: [job]",
-        "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 30 minutes.",
+        "Choose or switch jobs. Run `/trabaho` without selecting a job to work and get paid. Cooldown: 24 hours.",
     ),
     (
         "/tambay",
