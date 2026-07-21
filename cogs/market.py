@@ -27,10 +27,10 @@ ITEM_CHOICES = [
     app_commands.Choice(name=info["label"], value=key) for key, info in ITEMS.items()
 ]
 
-LOAD_BUY_PRICE = 8     # ₱ per unit, buying from a load retailer
+LOAD_BUY_PRICE = 8
 LOAD_SELL_MIN_MULT = 0.9
 LOAD_SELL_MAX_MULT = 1.5
-LOAD_BASE_SELL_PRICE = 10  # ₱ per unit baseline before the random multiplier
+LOAD_BASE_SELL_PRICE = 10
 
 
 def _get_or_refresh_market_row(item_key: str) -> dict:
@@ -74,20 +74,17 @@ class Market(commands.Cog):
     load = app_commands.Group(name="load", description="Buy mobile load and resell it for profit.")
 
     # ------------------------------------------------------ /palengke presyo
-    @palengke.command(name="presyo", description="See current palengke prices.")
+    @palengke.command(name="presyo", description="Check today's palengke prices.")
     async def palengke_presyo(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title="🥬 Palengke Prices Today",
-            color=discord.Color.orange(),
-        )
+        embed = discord.Embed(title="🥬 Palengke Prices Today", color=discord.Color.orange())
         for key, info in ITEMS.items():
             row = _get_or_refresh_market_row(key)
             embed.add_field(
                 name=f"{row['display_name']} ({info['unit']})",
-                value=f"Bili: {db.format_peso(row['buy_price'])} | Benta: {db.format_peso(row['sell_price'])}",
+                value=f"Buy: {db.format_peso(row['buy_price'])} | Sell: {db.format_peso(row['sell_price'])}",
                 inline=False,
             )
-        embed.set_footer(text="Prices update every few hours. Use /palengke bili or /palengke benta.")
+        embed.set_footer(text="Prices refresh every few hours. /palengke bili to buy, /palengke benta to sell.")
         await interaction.response.send_message(embed=embed)
 
     # -------------------------------------------------------- /palengke bili
@@ -107,9 +104,8 @@ class Market(commands.Cog):
 
         if cost > user["balance"]:
             await interaction.response.send_message(
-                f"Kulang ang pera mo! Kailangan mo ng {db.format_peso(cost)}, "
-                f"meron ka lang {db.format_peso(user['balance'])}.",
-                ephemeral=True,
+                f"Bro you're short by {db.format_peso(cost - user['balance'])} 💀 "
+                f"You've got {db.format_peso(user['balance'])}.",
             )
             return
 
@@ -117,9 +113,9 @@ class Market(commands.Cog):
         db.add_inventory(user_id, item.value, quantity)
 
         embed = discord.Embed(
-            title="🛒 Bumili sa Palengke",
-            description=f"Bumili ka ng **{quantity} {ITEMS[item.value]['unit']}** ng "
-            f"**{row['display_name']}** para sa **{db.format_peso(cost)}**.",
+            title="🛒 Palengke Run",
+            description=f"Copped **{quantity} {ITEMS[item.value]['unit']}** of "
+            f"**{row['display_name']}** for **{db.format_peso(cost)}**.",
             color=discord.Color.orange(),
         )
         embed.set_footer(text=f"Balance: {db.format_peso(new_balance)}")
@@ -140,8 +136,7 @@ class Market(commands.Cog):
 
         if quantity > owned:
             await interaction.response.send_message(
-                f"Wala kang sapat na {ITEMS[item.value]['label']}. Meron ka lang {owned}.",
-                ephemeral=True,
+                f"You don't even have {quantity} {ITEMS[item.value]['label']} 💀 You've got {owned}.",
             )
             return
 
@@ -151,9 +146,9 @@ class Market(commands.Cog):
         new_balance = db.add_balance(user_id, proceeds)
 
         embed = discord.Embed(
-            title="💰 Nagbenta sa Palengke",
-            description=f"Nagbenta ka ng **{quantity} {ITEMS[item.value]['unit']}** ng "
-            f"**{row['display_name']}** para sa **{db.format_peso(proceeds)}**.",
+            title="💰 Sold at the Palengke",
+            description=f"Flipped **{quantity} {ITEMS[item.value]['unit']}** of "
+            f"**{row['display_name']}** for **{db.format_peso(proceeds)}**. Entrepreneur behavior.",
             color=discord.Color.green(),
         )
         embed.set_footer(text=f"Balance: {db.format_peso(new_balance)}")
@@ -169,8 +164,7 @@ class Market(commands.Cog):
 
         if cost > user["balance"]:
             await interaction.response.send_message(
-                f"Kulang ang pera mo! Kailangan mo ng {db.format_peso(cost)}.",
-                ephemeral=True,
+                f"You need {db.format_peso(cost)} for that, you're short 💀",
             )
             return
 
@@ -178,8 +172,8 @@ class Market(commands.Cog):
         db.add_inventory(user_id, "load", quantity)
 
         embed = discord.Embed(
-            title="📱 Bumili ng Load",
-            description=f"Bumili ka ng **{quantity} units** ng load para sa **{db.format_peso(cost)}**.",
+            title="📱 Load Secured",
+            description=f"Bought **{quantity} units** of load for **{db.format_peso(cost)}**.",
             color=discord.Color.blue(),
         )
         embed.set_footer(text=f"Balance: {db.format_peso(new_balance)}")
@@ -194,8 +188,7 @@ class Market(commands.Cog):
 
         if quantity > owned:
             await interaction.response.send_message(
-                f"Wala kang sapat na load. Meron ka lang {owned} units.",
-                ephemeral=True,
+                f"You only have {owned} units of load, not {quantity} 💀",
             )
             return
 
@@ -205,11 +198,11 @@ class Market(commands.Cog):
         new_balance = db.add_balance(user_id, proceeds)
 
         profit = proceeds - (quantity * LOAD_BUY_PRICE)
-        verdict = "Cha-ching! 📈" if profit >= 0 else "Medyo lugi ka dito. 📉"
+        verdict = "Cha-ching, that's a W. 📈" if profit >= 0 else "Lugi ka dyan bestie. 📉"
 
         embed = discord.Embed(
-            title="📱 Nagbenta ng Load",
-            description=f"Nagbenta ka ng **{quantity} units** para sa **{db.format_peso(proceeds)}**.\n{verdict}",
+            title="📱 Load Resold",
+            description=f"Sold **{quantity} units** for **{db.format_peso(proceeds)}**.\n{verdict}",
             color=discord.Color.green() if profit >= 0 else discord.Color.red(),
         )
         embed.set_footer(text=f"Balance: {db.format_peso(new_balance)}")
