@@ -91,14 +91,6 @@ CATEGORIES = [
                 "🎫 /lottery join [tickets]",
                 "`Join the lottery using your lottery tickets.`",
             ),
-            (
-                "🏆 /lottery draw",
-                "`Owner-only command to draw the lottery winner.`",
-            ),
-            (
-                "➕ /create lottery",
-                "`Owner-only command to create a lottery.`",
-            ),
         ],
     ),
 
