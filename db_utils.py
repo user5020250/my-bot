@@ -467,6 +467,111 @@ def set_job(
 
 
 # ==========================================================
+# STATUS EFFECTS (business_status table)
+# ==========================================================
+
+_ALLOWED_STATUS_FIELDS = {
+    "protected_until",
+    "gloves_until",
+    "mask_until",
+}
+
+
+def ensure_status_effect_columns() -> None:
+
+    conn = get_conn()
+
+    existing_cols = {
+        row["name"] for row in conn.execute("PRAGMA table_info(business_status)")
+    }
+
+    additions = {
+        "gloves_until": "INTEGER NOT NULL DEFAULT 0",
+        "mask_until": "INTEGER NOT NULL DEFAULT 0",
+    }
+
+    for col, decl in additions.items():
+        if col not in existing_cols:
+            conn.execute(
+                f"ALTER TABLE business_status ADD COLUMN {col} {decl}"
+            )
+
+    conn.commit()
+    conn.close()
+
+
+def get_business_status(
+    user_id: str,
+) -> dict:
+
+    conn = get_conn()
+
+    row = conn.execute(
+        """
+        SELECT *
+        FROM business_status
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+
+    if row is None:
+        conn.execute(
+            """
+            INSERT INTO business_status (user_id)
+            VALUES (?)
+            """,
+            (user_id,),
+        )
+
+        conn.commit()
+
+        row = conn.execute(
+            """
+            SELECT *
+            FROM business_status
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+    conn.close()
+
+    return dict(row)
+
+
+def set_status_field(
+    user_id: str,
+    field: str,
+    value: int,
+) -> None:
+
+    if field not in _ALLOWED_STATUS_FIELDS:
+        raise ValueError(
+            f"Unknown status field: {field}"
+        )
+
+    get_business_status(user_id)
+
+    conn = get_conn()
+
+    conn.execute(
+        f"""
+        UPDATE business_status
+        SET {field} = ?
+        WHERE user_id = ?
+        """,
+        (
+            value,
+            user_id,
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+
+# ==========================================================
 # COOLDOWNS
 # ==========================================================
 
