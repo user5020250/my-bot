@@ -61,6 +61,10 @@ class Profile(commands.Cog):
             item["qty"]
             for item in inventory
         )
+        inventory_value = sum(
+            item["qty"] * item["avg_buy_price"]
+            for item in inventory
+        )
         embed = discord.Embed(
             color=WHITE,
         )
@@ -75,7 +79,7 @@ class Profile(commands.Cog):
             name="💰 Money",
             value=(
                 f"Wallet: `{db.format_peso(data['balance'])}`\n"
-                f"Net Worth: `{db.format_peso(data['balance'])}`"
+                f"Net Worth: `{db.format_peso(data['balance'] + inventory_value)}`"
             ),
             inline=True,
         )
@@ -90,7 +94,8 @@ class Profile(commands.Cog):
             name="🎒 Inventory",
             value=(
                 f"Unique: `{unique_items}`\n"
-                f"Total: `{total_items}`"
+                f"Total: `{total_items}`\n"
+                f"Value: `{db.format_peso(inventory_value)}`"
             ),
             inline=True,
         )
