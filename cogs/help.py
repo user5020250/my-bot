@@ -99,7 +99,7 @@ class HelpView(discord.ui.View):
         for name, desc in page:
             embed.add_field(
                 name=name,
-                value=f"{desc}\n\u200b",
+                value=desc",
                 inline=False,
             )
 
@@ -110,7 +110,7 @@ class HelpView(discord.ui.View):
             )
 
         embed.set_footer(
-            text=f"Page {self.index + 1}/{len(PAGES)} • Pinoy Economy Bot"
+            text=f"Page {self.index + 1}/{len(PAGES)} • unavailable economy bot"
         )
 
         return embed
