@@ -87,10 +87,6 @@ CATEGORIES = [
                 "🎟️ /use lottery_ticket",
                 "Consume one lottery ticket and enter the next draw.",
             ),
-            (
-                "🎲 /draw_lottery",
-                "Owner-only command that picks a random winner.",
-            ),
         ],
     ),
 
