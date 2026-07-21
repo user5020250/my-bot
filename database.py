@@ -68,6 +68,24 @@ def init_db() -> None:
             status TEXT NOT NULL DEFAULT 'active',
             created_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS owned_businesses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            business_key TEXT NOT NULL,
+            level INTEGER NOT NULL DEFAULT 1,
+            last_collected INTEGER NOT NULL,
+            lifetime_earnings INTEGER NOT NULL DEFAULT 0,
+            purchased_at INTEGER NOT NULL,
+            UNIQUE (
+                user_id,
+                business_key
+            )
+        );
+        CREATE TABLE IF NOT EXISTS business_status (
+            user_id TEXT PRIMARY KEY,
+            last_raid INTEGER NOT NULL DEFAULT 0,
+            protected_until INTEGER NOT NULL DEFAULT 0
+        );
         """
     )
 
