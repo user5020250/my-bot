@@ -40,16 +40,23 @@ def ensure_lottery_table():
     conn.close()
 
 
-class CreateGroup(app_commands.Group):
-    def __init__(self, cog):
-        super().__init__(
-            name="create",
-            description="Create commands."
-        )
+class Lottery(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-        self.cog = cog
+        ensure_lottery_table()
 
-    @app_commands.command(
+    lottery_group = app_commands.Group(
+        name="lottery",
+        description="Lottery commands."
+    )
+
+    create_group = app_commands.Group(
+        name="create",
+        description="Create commands."
+    )
+
+    @create_group.command(
         name="lottery",
         description="Create a lottery."
     )
@@ -57,7 +64,7 @@ class CreateGroup(app_commands.Group):
         prize="Lottery prize",
         hours="How many hours before it ends"
     )
-    async def lottery(
+    async def create_lottery(
         self,
         interaction: discord.Interaction,
         prize: int,
@@ -124,20 +131,6 @@ class CreateGroup(app_commands.Group):
         await interaction.response.send_message(
             embed=embed
         )
-
-
-class Lottery(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-
-        ensure_lottery_table()
-
-        self.create_group = CreateGroup(self)
-
-    lottery_group = app_commands.Group(
-        name="lottery",
-        description="Lottery commands."
-    )
 
     @lottery_group.command(
         name="draw",
@@ -259,6 +252,12 @@ async def setup(bot):
 
     await bot.add_cog(cog)
 
-    bot.tree.add_command(
-        cog.create_group
-    )
+    try:
+        bot.tree.add_command(cog.create_group)
+    except app_commands.CommandAlreadyRegistered:
+        pass
+
+    try:
+        bot.tree.add_command(cog.lottery_group)
+    except app_commands.CommandAlreadyRegistered:
+        pass
