@@ -22,6 +22,106 @@ _ALLOWED_COOLDOWN_FIELDS = {
     "last_yearly",
 }
 
+# ==========================================================
+# LOTTERY
+# ==========================================================
+
+def join_lottery(
+    user_id: str,
+    tickets: int = 1,
+) -> bool:
+
+    if tickets <= 0:
+        return False
+
+    if not has_item(
+        user_id,
+        "lottery_ticket",
+        tickets,
+    ):
+        return False
+
+    conn = get_conn()
+
+    current = conn.execute(
+        """
+        SELECT tickets
+        FROM lottery_entries
+        WHERE user_id = ?
+        """,
+        (
+            user_id,
+        ),
+    ).fetchone()
+
+    current_tickets = 0
+
+    if current:
+        current_tickets = current["tickets"]
+
+    conn.execute(
+        """
+        INSERT INTO lottery_entries (
+            user_id,
+            tickets
+        )
+        VALUES (?, ?)
+
+        ON CONFLICT(user_id)
+
+        DO UPDATE SET
+            tickets = ?
+        """,
+        (
+            user_id,
+            current_tickets + tickets,
+            current_tickets + tickets,
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+    remove_inventory(
+        user_id,
+        "lottery_ticket",
+        tickets,
+    )
+
+    return True
+
+
+def get_lottery_entries() -> list[dict]:
+
+    conn = get_conn()
+
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM lottery_entries
+        """
+    ).fetchall()
+
+    conn.close()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def clear_lottery_entries():
+
+    conn = get_conn()
+
+    conn.execute(
+        """
+        DELETE FROM lottery_entries
+        """
+    )
+
+    conn.commit()
+    conn.close()
 
 # ==========================================================
 # USERS
