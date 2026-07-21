@@ -71,7 +71,7 @@ CATEGORIES = [
             ),
             (
                 "🎟️ Lottery Ticket",
-                "Use it to enter the global lottery.",
+                "Consumed automatically when you use `/lottery join`.",
             ),
             (
                 "💰 /balance [user]",
@@ -84,8 +84,12 @@ CATEGORIES = [
         "🎟️ Lottery",
         [
             (
-                "🎟️ /use lottery_ticket",
-                "Consume one lottery ticket and enter the next draw.",
+                "🎟️ /lottery info",
+                "View the current lottery prize, tickets, and end time.",
+            ),
+            (
+                "🎫 /lottery join [tickets]",
+                "Join the lottery using your lottery tickets.",
             ),
         ],
     ),
@@ -147,7 +151,7 @@ CATEGORIES = [
             ),
             (
                 "💵 /business collect",
-                "Collect income.",
+                "Collect business income.",
             ),
             (
                 "⬆️ /business upgrade",
@@ -200,7 +204,6 @@ CATEGORIES = [
         ],
     ),
 ]
-
 PAGES = []
 
 for category_name, category_commands in CATEGORIES:
