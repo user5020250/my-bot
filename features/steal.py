@@ -10,29 +10,50 @@ import db_utils as db
 
 WHITE = discord.Color(0xFFFFFF)
 
-# Reusing the "last_budol" cooldown column that already exists on the
-# users table (it used to back /scam). Rename via a migration later if
-# you want the column name to match /steal instead.
 STEAL_COOLDOWN_SECONDS = 24 * 60 * 60
 
-STEAL_MIN_PERCENT = 0.20
-STEAL_MAX_PERCENT = 0.60
+STEAL_BRACKETS = [
+    (0, 0.30, 0.60),           # ₱0+
+    (100_000, 0.40, 0.80),    # ₱100k+
+    (500_000, 0.50, 1.00),    # ₱500k+
+    (1_000_000, 0.75, 1.25),  # ₱1m+
+    (5_000_000, 0.80, 1.50),  # ₱5m+
+    (10_000_000, 1.00, 2.00), # ₱10m+
+]
 
-# Don't let people bother stealing from someone who has next to nothing.
-STEAL_MIN_TARGET_BALANCE = 1000
+STEAL_MIN_TARGET_BALANCE = 1_000
 
 
 def get_protected_until(user_id: str) -> int:
     conn = get_conn()
 
     row = conn.execute(
-        "SELECT protected_until FROM business_status WHERE user_id = ?",
+        """
+        SELECT protected_until
+        FROM business_status
+        WHERE user_id = ?
+        """,
         (user_id,),
     ).fetchone()
 
     conn.close()
 
     return row["protected_until"] if row else 0
+
+
+def get_steal_percent(balance: int) -> float:
+    minimum = 0.30
+    maximum = 0.60
+
+    for threshold, low, high in STEAL_BRACKETS:
+        if balance >= threshold:
+            minimum = low
+            maximum = high
+
+    return random.uniform(
+        minimum,
+        maximum,
+    )
 
 
 class Steal(commands.Cog):
@@ -43,7 +64,9 @@ class Steal(commands.Cog):
         name="steal",
         description="Attempt to steal money from another player.",
     )
-    @app_commands.describe(target="Who to steal from")
+    @app_commands.describe(
+        target="Who to steal from",
+    )
     async def steal(
         self,
         interaction: discord.Interaction,
@@ -72,13 +95,16 @@ class Steal(commands.Cog):
 
         if remaining > 0:
             await interaction.response.send_message(
-                f"🕒 You need to lay low. "
+                f"🕒 You need to lay low.\n"
                 f"Try again in **{db.format_duration(remaining)}**."
             )
             return
 
-        protected_until = get_protected_until(target_id)
         now = int(time.time())
+
+        protected_until = get_protected_until(
+            target_id
+        )
 
         if protected_until > now:
             await interaction.response.send_message(
@@ -87,43 +113,66 @@ class Steal(commands.Cog):
             )
             return
 
-        target_user = db.get_user(target_id)
+        target_user = db.get_user(
+            target_id
+        )
 
-        if target_user["balance"] < STEAL_MIN_TARGET_BALANCE:
+        balance = target_user["balance"]
+
+        if balance < STEAL_MIN_TARGET_BALANCE:
             await interaction.response.send_message(
-                f"💸 {target.mention} barely has any money. Not worth the risk."
+                f"💸 {target.mention} barely has any money."
             )
             return
 
-        # Cooldown only gets set once we know the attempt actually goes through.
         db.set_cooldown(
             thief_id,
             "last_budol",
             now,
         )
 
-        stolen = round(
-            target_user["balance"]
-            * random.uniform(STEAL_MIN_PERCENT, STEAL_MAX_PERCENT)
+        percent = get_steal_percent(
+            balance
         )
 
-        db.add_balance(target_id, -stolen)
-        new_balance = db.add_balance(thief_id, stolen)
+        stolen = round(
+            balance * percent
+        )
+
+        db.add_balance(
+            target_id,
+            -stolen,
+        )
+
+        new_balance = db.add_balance(
+            thief_id,
+            stolen,
+        )
 
         embed = discord.Embed(
             title="🥷 Robbery Success",
             description=(
-                f"You stole **{db.format_peso(stolen)}** from {target.mention}."
+                f"You stole **{db.format_peso(stolen)}** "
+                f"from {target.mention}.\n\n"
+                f"That's **{percent * 100:.0f}%** "
+                f"of their balance."
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=f"💰 Balance: {db.format_peso(new_balance)}"
+            text=(
+                f"💰 Balance: "
+                f"{db.format_peso(new_balance)}"
+            )
         )
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(
+            embed=embed
+        )
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(Steal(bot))
+    await bot.add_cog(
+        Steal(bot)
+    )
