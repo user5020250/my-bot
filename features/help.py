@@ -92,7 +92,7 @@ CATEGORIES = [
                 "`Join the lottery using your lottery tickets.`",
             ),
             (
-                "🎫 /lottery channel [channel]",
+                "🎫 /lottery setchannel [channel]",
                 "`Set the channel where lottery announcements will be sent.`",
             ),
             
