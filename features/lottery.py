@@ -115,8 +115,8 @@ class Lottery(commands.Cog):
         embed = discord.Embed(
             title="🎟️ Lottery Created",
             description=(
-                f"Prize: **{db.format_peso(prize)}**\n"
-                f"Ends: <t:{ends_at}:R>\n\n"
+                f"💰 Prize: **{db.format_peso(prize)}**\n"
+                f"⏳ Ends: <t:{ends_at}:R>\n\n"
                 f"Use lottery tickets to join."
             ),
             color=WHITE,
@@ -124,6 +124,88 @@ class Lottery(commands.Cog):
 
         await interaction.response.send_message(
             embed=embed
+        )
+
+    @lottery_group.command(
+        name="info",
+        description="View the current lottery.",
+    )
+    async def lottery_info(
+        self,
+        interaction: discord.Interaction,
+    ):
+        lottery = db.get_lottery()
+
+        if lottery is None:
+            await interaction.response.send_message(
+                "❌ No active lottery.",
+                ephemeral=True,
+            )
+            return
+
+        entries = db.get_lottery_entries()
+
+        total_tickets = sum(
+            entry["tickets"]
+            for entry in entries
+        )
+
+        embed = discord.Embed(
+            title="🎟️ Current Lottery",
+            description=(
+                f"💰 Prize: **{db.format_peso(lottery['prize'])}**\n"
+                f"🎫 Total Tickets: **{total_tickets:,}**\n"
+                f"⏳ Ends: <t:{lottery['ends_at']}:R>"
+            ),
+            color=WHITE,
+        )
+
+        await interaction.response.send_message(
+            embed=embed
+        )
+
+    @lottery_group.command(
+        name="join",
+        description="Join the current lottery.",
+    )
+    @app_commands.describe(
+        tickets="How many tickets to use",
+    )
+    async def join_lottery(
+        self,
+        interaction: discord.Interaction,
+        tickets: int = 1,
+    ):
+        lottery = db.get_lottery()
+
+        if lottery is None:
+            await interaction.response.send_message(
+                "❌ No active lottery.",
+                ephemeral=True,
+            )
+            return
+
+        if tickets <= 0:
+            await interaction.response.send_message(
+                "❌ Invalid ticket amount.",
+                ephemeral=True,
+            )
+            return
+
+        success = db.join_lottery(
+            str(interaction.user.id),
+            tickets,
+        )
+
+        if not success:
+            await interaction.response.send_message(
+                "❌ You don't have enough lottery tickets.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(
+            f"🎟️ You joined with **{tickets}** ticket(s)."
         )
 
     @lottery_group.command(
