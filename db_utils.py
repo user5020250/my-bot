@@ -23,6 +23,55 @@ _ALLOWED_COOLDOWN_FIELDS = {
 }
 
 # ==========================================================
+# ADMIN
+# ==========================================================
+
+def reset_all_cooldowns() -> None:
+
+    conn = get_conn()
+
+    fields = ", ".join(
+        f"{field} = 0"
+        for field in _ALLOWED_COOLDOWN_FIELDS
+    )
+
+    conn.execute(
+        f"""
+        UPDATE users
+        SET {fields}
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def reset_user_cooldowns(
+    user_id: str,
+) -> None:
+
+    get_user(user_id)
+
+    conn = get_conn()
+
+    fields = ", ".join(
+        f"{field} = 0"
+        for field in _ALLOWED_COOLDOWN_FIELDS
+    )
+
+    conn.execute(
+        f"""
+        UPDATE users
+        SET {fields}
+        WHERE id = ?
+        """,
+        (user_id,),
+    )
+
+    conn.commit()
+    conn.close()
+
+# ==========================================================
 # LOTTERY
 # ==========================================================
 
