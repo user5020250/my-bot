@@ -209,23 +209,23 @@ class Economy(commands.Cog):
             color=discord.Color.blurple(),
         )
         embed.set_thumbnail(url=target.display_avatar.url)
-        embed.add_field(name="💰 Balance", value=db.format_peso(data["balance"]), inline=True)
-        embed.add_field(name=f"{job_emoji} Job", value=job_label, inline=True)
-        embed.add_field(name="\u200b", value="\u200b", inline=True)  # spacer for clean grid
+        embed.add_field(name="Balance: ", value=db.format_peso(data["balance"]), inline=False)
+        embed.add_field(name=f"{job_emoji} Job: ", value=job_label, inline=False)
+        embed.add_field(name="\u200b", value="\u200b", inline=False)  # spacer for clean grid
         embed.add_field(
             name="⏳ Trabaho",
             value="Ready ✅" if trabaho_cd == 0 else db.format_duration(trabaho_cd),
-            inline=True,
+            inline=False,
         )
         embed.add_field(
             name="⏳ Tambay",
             value="Ready ✅" if tambay_cd == 0 else db.format_duration(tambay_cd),
-            inline=True,
+            inline=False,
         )
         embed.add_field(
             name="⏳ Baon",
             value="Ready ✅" if baon_cd == 0 else db.format_duration(baon_cd),
-            inline=True,
+            inline=False,
         )
         embed.set_footer(text="It's giving financial stability... or not 💅")
         await interaction.response.send_message(embed=embed)
