@@ -29,6 +29,8 @@ COGS = [
     "features.business",
     "features.rewards",
     "features.leaderboard",
+    "features.steal",
+    "features.shop",
 ]
 
 
