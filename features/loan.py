@@ -375,27 +375,36 @@ class Social(commands.Cog):
 
     # ---------------------------------------------------------- /loan group
 
+class Social(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.pending_requests = {}
+        self._next_request_id = 1
+
+        ensure_loans_table()
+
     utang_group = app_commands.Group(
         name="loan",
         description="💰 Loan system.",
     )
 
-   # ------------------------------------------------------- /loan request
+    # ------------------------------------------------------- /loan request
 
-@utang_group.command(
-    name="request",
-    description="Request a loan from another player.",
-)
-@app_commands.describe(
-    lender="Who you're borrowing from",
-    amount="How much to borrow",
-)
-async def utang_request(
-    self,
-    interaction: discord.Interaction,
-    lender: discord.Member,
-    amount: str,
-):
+    @utang_group.command(
+        name="request",
+        description="Request a loan from another player.",
+    )
+    @app_commands.describe(
+        lender="Who you're borrowing from",
+        amount="How much to borrow",
+    )
+    async def utang_request(
+        self,
+        interaction: discord.Interaction,
+        lender: discord.Member,
+        amount: str,
+    ):
+        
     borrower = interaction.user
     borrower_id = str(borrower.id)
     lender_id = str(lender.id)
