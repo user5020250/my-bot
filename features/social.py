@@ -1,5 +1,6 @@
 import random
 import time
+from datetime import datetime, timedelta, timezone
 
 import discord
 from discord import app_commands
@@ -15,28 +16,273 @@ KARAOKE_COOLDOWN_SECONDS = 5 * 60
 
 BUDOL_SUCCESS_CHANCE = 0.4
 
+# ------------------------------------------------------------------ /utang
+
+LOAN_INTEREST_RATE = 0.20
+LOAN_DUE_DAYS = 7
+LOAN_REQUEST_TIMEOUT_SECONDS = 60
+
+
+def ensure_loans_table():
+    conn = get_conn()
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS loans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lender TEXT NOT NULL,
+            borrower TEXT NOT NULL,
+            principal INTEGER NOT NULL,
+            remaining INTEGER NOT NULL,
+            due_date INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at INTEGER NOT NULL
+        )
+        """
+    )
+
+    conn.commit()
+    conn.close()
+
+
+class LoanRequestView(discord.ui.View):
+    """
+    Confirmation buttons shown to the lender when a borrower
+    sends a /utang request. Expires automatically after
+    LOAN_REQUEST_TIMEOUT_SECONDS.
+    """
+
+    def __init__(
+        self,
+        cog: "Social",
+        request_id: int,
+        borrower: discord.Member,
+        lender: discord.Member,
+        principal: int,
+        total_due: int,
+        due_ts: int,
+    ):
+        super().__init__(timeout=LOAN_REQUEST_TIMEOUT_SECONDS)
+
+        self.cog = cog
+        self.request_id = request_id
+        self.borrower = borrower
+        self.lender = lender
+        self.principal = principal
+        self.total_due = total_due
+        self.due_ts = due_ts
+        self.message: discord.Message | None = None
+        self.resolved = False
+
+    def _closed_embed(self, description: str, color: discord.Color) -> discord.Embed:
+        embed = discord.Embed(
+            title="Loan Request",
+            description=description,
+            color=color,
+        )
+        return embed
+
+    async def on_timeout(self):
+        if self.resolved:
+            return
+
+        self.resolved = True
+        self.cog.pending_requests.pop(self.request_id, None)
+
+        for child in self.children:
+            child.disabled = True
+
+        if self.message is not None:
+            try:
+                await self.message.edit(
+                    embed=self._closed_embed(
+                        f"Nag-expire na ang loan request ni "
+                        f"{self.borrower.mention} kay "
+                        f"{self.lender.mention}.",
+                        WHITE,
+                    ),
+                    view=self,
+                )
+            except discord.HTTPException:
+                pass
+
+    @discord.ui.button(
+        label="Approve",
+        style=discord.ButtonStyle.success,
+        emoji="✅",
+    )
+    async def approve(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if interaction.user.id != self.lender.id:
+            await interaction.response.send_message(
+                "Hindi para sa'yo ang request na ito.",
+                ephemeral=True,
+            )
+            return
+
+        if self.resolved:
+            await interaction.response.send_message(
+                "Tapos na ang request na ito.",
+                ephemeral=True,
+            )
+            return
+
+        lender_user = db.get_user(str(self.lender.id))
+
+        if lender_user["balance"] < self.principal:
+            self.resolved = True
+            self.cog.pending_requests.pop(self.request_id, None)
+
+            for child in self.children:
+                child.disabled = True
+
+            await interaction.response.edit_message(
+                embed=self._closed_embed(
+                    f"Hindi na-approve. Wala nang sapat na pera si "
+                    f"{self.lender.mention}.",
+                    WHITE,
+                ),
+                view=self,
+            )
+            return
+
+        self.resolved = True
+        self.cog.pending_requests.pop(self.request_id, None)
+
+        db.add_balance(str(self.lender.id), -self.principal)
+        new_balance = db.add_balance(str(self.borrower.id), self.principal)
+
+        conn = get_conn()
+
+        cursor = conn.execute(
+            """
+            INSERT INTO loans (
+                lender,
+                borrower,
+                principal,
+                remaining,
+                due_date,
+                status,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, 'active', ?)
+            """,
+            (
+                str(self.lender.id),
+                str(self.borrower.id),
+                self.principal,
+                self.total_due,
+                self.due_ts,
+                int(time.time()),
+            ),
+        )
+
+        loan_id = cursor.lastrowid
+
+        conn.commit()
+        conn.close()
+
+        for child in self.children:
+            child.disabled = True
+
+        embed = discord.Embed(
+            title="Loan Approved",
+            description=(
+                f"{self.lender.mention} lent "
+                f"**{db.format_peso(self.principal)}** "
+                f"to {self.borrower.mention}.\n\n"
+                f"Total due: **{db.format_peso(self.total_due)}**\n"
+                f"Due date: <t:{self.due_ts}:D>\n"
+                f"Loan ID: `{loan_id}`\n\n"
+                f"Use `/utang pay` to repay."
+            ),
+            color=WHITE,
+        )
+
+        embed.set_footer(
+            text=f"{self.borrower.display_name}'s balance: {db.format_peso(new_balance)}"
+        )
+
+        await interaction.response.edit_message(
+            embed=embed,
+            view=self,
+        )
+
+    @discord.ui.button(
+        label="Decline",
+        style=discord.ButtonStyle.danger,
+        emoji="❌",
+    )
+    async def decline(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if interaction.user.id != self.lender.id:
+            await interaction.response.send_message(
+                "Hindi para sa'yo ang request na ito.",
+                ephemeral=True,
+            )
+            return
+
+        if self.resolved:
+            await interaction.response.send_message(
+                "Tapos na ang request na ito.",
+                ephemeral=True,
+            )
+            return
+
+        self.resolved = True
+        self.cog.pending_requests.pop(self.request_id, None)
+
+        for child in self.children:
+            child.disabled = True
+
+        await interaction.response.edit_message(
+            embed=self._closed_embed(
+                "Loan request declined.",
+                WHITE,
+            ),
+            view=self,
+        )
+
 
 class Social(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.pending_requests: dict[int, LoanRequestView] = {}
+        self._next_request_id = 1
 
-    # -------------------------------------------------------------- /utang
+        ensure_loans_table()
 
-    @app_commands.command(
+    # ---------------------------------------------------------- /utang group
+
+    utang_group = app_commands.Group(
         name="utang",
-        description="Borrow money from another player.",
+        description="Loan system.",
+    )
+
+    # ------------------------------------------------------ /utang request
+
+    @utang_group.command(
+        name="request",
+        description="Request a loan from another player.",
     )
     @app_commands.describe(
         lender="Who you're borrowing from",
         amount="How much to borrow",
     )
-    async def utang(
+    async def utang_request(
         self,
         interaction: discord.Interaction,
         lender: discord.Member,
         amount: app_commands.Range[int, 1],
     ):
-        borrower_id = str(interaction.user.id)
+        borrower = interaction.user
+        borrower_id = str(borrower.id)
         lender_id = str(lender.id)
 
         if lender_id == borrower_id:
@@ -51,110 +297,89 @@ class Social(commands.Cog):
             )
             return
 
-        lender_user = db.get_user(lender_id)
+        principal = int(amount)
+        total_due = round(principal * (1 + LOAN_INTEREST_RATE))
+        due_dt = datetime.now(timezone.utc) + timedelta(days=LOAN_DUE_DAYS)
+        due_ts = int(due_dt.timestamp())
 
-        if lender_user["balance"] < amount:
-            await interaction.response.send_message(
-                f"Walang sapat na pera si {lender.display_name}."
-            )
-            return
+        request_id = self._next_request_id
+        self._next_request_id += 1
 
-        db.add_balance(lender_id, -amount)
-        new_balance = db.add_balance(borrower_id, amount)
-
-        conn = get_conn()
-
-        conn.execute(
-            """
-            INSERT INTO debts (
-                lender,
-                borrower,
-                amount,
-                created_at
-            )
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                lender_id,
-                borrower_id,
-                amount,
-                int(time.time()),
-            ),
+        view = LoanRequestView(
+            cog=self,
+            request_id=request_id,
+            borrower=borrower,
+            lender=lender,
+            principal=principal,
+            total_due=total_due,
+            due_ts=due_ts,
         )
 
-        conn.commit()
-        conn.close()
-
         embed = discord.Embed(
-            title="Utang Approved",
+            title="💸 Loan Request",
             description=(
-                f"{interaction.user.mention} borrowed "
-                f"**{db.format_peso(amount)}** "
-                f"from {lender.mention}.\n\n"
-                f"Use `/bayad` to pay it back."
+                f"Borrower: {borrower.mention}\n"
+                f"Amount: **{db.format_peso(principal)}**\n"
+                f"Repayment: **{db.format_peso(total_due)}** "
+                f"({int(LOAN_INTEREST_RATE * 100)}% interest)\n"
+                f"Due: <t:{due_ts}:D>"
             ),
             color=WHITE,
         )
 
         embed.set_footer(
-            text=f"Balance: {db.format_peso(new_balance)}"
+            text=f"Expires in {LOAN_REQUEST_TIMEOUT_SECONDS} seconds"
         )
 
         await interaction.response.send_message(
-            embed=embed
+            content=lender.mention,
+            embed=embed,
+            view=view,
         )
 
-    # -------------------------------------------------------------- /bayad
+        view.message = await interaction.original_response()
+        self.pending_requests[request_id] = view
 
-    @app_commands.command(
-        name="bayad",
-        description="Pay your debt.",
+    # ----------------------------------------------------------- /utang pay
+
+    @utang_group.command(
+        name="pay",
+        description="Pay off your active loans.",
     )
     @app_commands.describe(
-        lender="Who you owe money to",
         amount="How much to pay",
     )
-    async def bayad(
+    async def utang_pay(
         self,
         interaction: discord.Interaction,
-        lender: discord.Member,
         amount: app_commands.Range[int, 1],
     ):
         borrower_id = str(interaction.user.id)
-        lender_id = str(lender.id)
 
         conn = get_conn()
 
-        debts = conn.execute(
+        loans = conn.execute(
             """
             SELECT *
-            FROM debts
-            WHERE lender = ?
-            AND borrower = ?
+            FROM loans
+            WHERE borrower = ?
+            AND status = 'active'
             ORDER BY created_at ASC
             """,
-            (
-                lender_id,
-                borrower_id,
-            ),
+            (borrower_id,),
         ).fetchall()
 
-        total_owed = sum(
-            debt["amount"]
-            for debt in debts
-        )
+        total_owed = sum(loan["remaining"] for loan in loans)
 
         if total_owed == 0:
             conn.close()
 
             await interaction.response.send_message(
-                f"Wala kang utang kay {lender.display_name}."
+                "Wala kang aktibong utang."
             )
             return
 
-        borrower_user = db.get_user(
-            borrower_id
-        )
+        borrower_user = db.get_user(borrower_id)
 
         pay_amount = min(
             amount,
@@ -170,71 +395,59 @@ class Social(commands.Cog):
             )
             return
 
-        remaining = pay_amount
+        remaining_to_pay = pay_amount
+        paid_lines = []
 
-        for debt in debts:
-            if remaining <= 0:
+        for loan in loans:
+            if remaining_to_pay <= 0:
                 break
 
-            payment = min(
-                debt["amount"],
-                remaining,
-            )
+            payment = min(loan["remaining"], remaining_to_pay)
+            new_remaining = loan["remaining"] - payment
 
-            new_amount = (
-                debt["amount"] - payment
-            )
-
-            if new_amount <= 0:
+            if new_remaining <= 0:
                 conn.execute(
-                    "DELETE FROM debts WHERE id = ?",
-                    (debt["id"],),
+                    """
+                    UPDATE loans
+                    SET remaining = 0, status = 'paid'
+                    WHERE id = ?
+                    """,
+                    (loan["id"],),
                 )
             else:
                 conn.execute(
                     """
-                    UPDATE debts
-                    SET amount = ?
+                    UPDATE loans
+                    SET remaining = ?
                     WHERE id = ?
                     """,
-                    (
-                        new_amount,
-                        debt["id"],
-                    ),
+                    (new_remaining, loan["id"]),
                 )
 
-            remaining -= payment
+            db.add_balance(borrower_id, -payment)
+            db.add_balance(loan["lender"], payment)
+
+            paid_lines.append(
+                f"Loan `{loan['id']}` → <@{loan['lender']}>: "
+                f"**{db.format_peso(payment)}**"
+            )
+
+            remaining_to_pay -= payment
 
         conn.commit()
         conn.close()
 
-        db.add_balance(
-            borrower_id,
-            -pay_amount,
-        )
-
-        db.add_balance(
-            lender_id,
-            pay_amount,
-        )
-
         left = total_owed - pay_amount
 
-        description = (
-            f"Nagbayad ka ng "
-            f"**{db.format_peso(pay_amount)}** "
-            f"kay {lender.mention}."
-        )
+        description = "\n".join(paid_lines)
 
         if left > 0:
             description += (
-                f"\n\nMay utang ka pang "
+                f"\n\nMay natitira ka pang utang na "
                 f"**{db.format_peso(left)}**."
             )
         else:
-            description += (
-                "\n\nBayad na lahat."
-            )
+            description += "\n\nBayad na lahat ng utang mo."
 
         embed = discord.Embed(
             title="Bayad Utang",
@@ -242,8 +455,195 @@ class Social(commands.Cog):
             color=WHITE,
         )
 
+        await interaction.response.send_message(embed=embed)
+
+    # ---------------------------------------------------------- /utang list
+
+    @utang_group.command(
+        name="list",
+        description="Show your active loans (as borrower and lender).",
+    )
+    async def utang_list(
+        self,
+        interaction: discord.Interaction,
+    ):
+        user_id = str(interaction.user.id)
+
+        conn = get_conn()
+
+        borrowed = conn.execute(
+            """
+            SELECT *
+            FROM loans
+            WHERE borrower = ?
+            AND status = 'active'
+            ORDER BY created_at ASC
+            """,
+            (user_id,),
+        ).fetchall()
+
+        lent = conn.execute(
+            """
+            SELECT *
+            FROM loans
+            WHERE lender = ?
+            AND status = 'active'
+            ORDER BY created_at ASC
+            """,
+            (user_id,),
+        ).fetchall()
+
+        conn.close()
+
+        embed = discord.Embed(
+            title="Utang Overview",
+            color=WHITE,
+        )
+
+        if borrowed:
+            lines = [
+                f"`{loan['id']}` To <@{loan['lender']}>: "
+                f"**{db.format_peso(loan['remaining'])}** "
+                f"(due <t:{loan['due_date']}:R>)"
+                for loan in borrowed
+            ]
+            embed.add_field(
+                name="You owe",
+                value="\n".join(lines),
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="You owe",
+                value="Wala.",
+                inline=False,
+            )
+
+        if lent:
+            lines = [
+                f"`{loan['id']}` From <@{loan['borrower']}>: "
+                f"**{db.format_peso(loan['remaining'])}** "
+                f"(due <t:{loan['due_date']}:R>)"
+                for loan in lent
+            ]
+            embed.add_field(
+                name="Owed to you",
+                value="\n".join(lines),
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="Owed to you",
+                value="Wala.",
+                inline=False,
+            )
+
+        await interaction.response.send_message(embed=embed)
+
+    # ---------------------------------------------------------- /utang info
+
+    @utang_group.command(
+        name="info",
+        description="Show details for a specific loan.",
+    )
+    @app_commands.describe(
+        loan_id="The loan ID",
+    )
+    async def utang_info(
+        self,
+        interaction: discord.Interaction,
+        loan_id: int,
+    ):
+        conn = get_conn()
+
+        loan = conn.execute(
+            "SELECT * FROM loans WHERE id = ?",
+            (loan_id,),
+        ).fetchone()
+
+        conn.close()
+
+        if loan is None:
+            await interaction.response.send_message(
+                f"Walang loan na may ID `{loan_id}`."
+            )
+            return
+
+        user_id = str(interaction.user.id)
+
+        if user_id not in (loan["lender"], loan["borrower"]):
+            await interaction.response.send_message(
+                "Hindi mo makikita ang loan na ito."
+            )
+            return
+
+        embed = discord.Embed(
+            title=f"Loan #{loan['id']}",
+            description=(
+                f"Lender: <@{loan['lender']}>\n"
+                f"Borrower: <@{loan['borrower']}>\n"
+                f"Principal: **{db.format_peso(loan['principal'])}**\n"
+                f"Remaining: **{db.format_peso(loan['remaining'])}**\n"
+                f"Due: <t:{loan['due_date']}:D>\n"
+                f"Status: `{loan['status']}`"
+            ),
+            color=WHITE,
+        )
+
+        await interaction.response.send_message(embed=embed)
+
+    # -------------------------------------------------------- /utang cancel
+
+    @utang_group.command(
+        name="cancel",
+        description="Cancel one of your pending loan requests.",
+    )
+    @app_commands.describe(
+        request_id="The loan request ID",
+    )
+    async def utang_cancel(
+        self,
+        interaction: discord.Interaction,
+        request_id: int,
+    ):
+        view = self.pending_requests.get(request_id)
+
+        if view is None:
+            await interaction.response.send_message(
+                f"Walang pending request na may ID `{request_id}`."
+            )
+            return
+
+        if view.borrower.id != interaction.user.id:
+            await interaction.response.send_message(
+                "Hindi mo request ito."
+            )
+            return
+
+        view.resolved = True
+        self.pending_requests.pop(request_id, None)
+
+        for child in view.children:
+            child.disabled = True
+
+        if view.message is not None:
+            try:
+                await view.message.edit(
+                    embed=discord.Embed(
+                        title="Loan Request",
+                        description=(
+                            f"Kinansela ni {view.borrower.mention} "
+                            f"ang loan request niya."
+                        ),
+                        color=WHITE,
+                    ),
+                    view=view,
+                )
+            except discord.HTTPException:
+                pass
+
         await interaction.response.send_message(
-            embed=embed
+            f"Kinansela ang request `{request_id}`."
         )
 
     # -------------------------------------------------------------- /budol
