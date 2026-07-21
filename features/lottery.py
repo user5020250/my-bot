@@ -1,5 +1,4 @@
 import random
-import time
 
 import discord
 from discord import app_commands
@@ -13,67 +12,36 @@ WHITE = discord.Color(0xFFFFFF)
 OWNER_ID = 843377668488429569
 
 
-def ensure_lottery_table():
-    conn = get_conn()
-
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS lotteries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            prize INTEGER NOT NULL,
-            ends_at INTEGER NOT NULL,
-            active INTEGER NOT NULL DEFAULT 1
-        )
-        """
-    )
-
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS lottery_entries (
-            user_id TEXT PRIMARY KEY,
-            tickets INTEGER NOT NULL DEFAULT 0
-        )
-        """
-    )
-
-    conn.commit()
-    conn.close()
-
-
 class Lottery(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-        ensure_lottery_table()
-
     lottery_group = app_commands.Group(
         name="lottery",
-        description="Lottery commands."
+        description="Lottery commands.",
     )
 
     create_group = app_commands.Group(
         name="create",
-        description="Create commands."
+        description="Create commands.",
     )
 
     @create_group.command(
         name="lottery",
-        description="Create a lottery."
+        description="Create a lottery.",
     )
     @app_commands.describe(
         prize="Lottery prize (500k, 1m, 2b)",
-        hours="How many hours before it ends"
     )
     async def create_lottery(
         self,
         interaction: discord.Interaction,
         prize: str,
-        hours: int,
     ):
         if interaction.user.id != OWNER_ID:
             await interaction.response.send_message(
                 "❌ Owner only.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -84,71 +52,26 @@ class Lottery(commands.Cog):
             await interaction.response.send_message(
                 "❌ Invalid amount.\n"
                 "Examples: `500k`, `2m`, `1b`.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
-        if prize <= 0:
-            await interaction.response.send_message(
-                "❌ Prize must be greater than 0.",
-                ephemeral=True
-            )
-            return
+        current = db.get_lottery()
 
-        if hours <= 0:
-            await interaction.response.send_message(
-                "❌ Hours must be greater than 0.",
-                ephemeral=True
-            )
-            return
-
-        conn = get_conn()
-
-        existing = conn.execute(
-            """
-            SELECT *
-            FROM lotteries
-            WHERE active = 1
-            """
-        ).fetchone()
-
-        if existing:
-            conn.close()
-
+        if current is not None:
             await interaction.response.send_message(
                 "❌ There is already an active lottery.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
-        ends_at = int(time.time()) + (hours * 3600)
-
-        cursor = conn.execute(
-            """
-            INSERT INTO lotteries (
-                prize,
-                ends_at,
-                active
-            )
-            VALUES (?, ?, 1)
-            """,
-            (
-                prize,
-                ends_at,
-            ),
-        )
-
-        lottery_id = cursor.lastrowid
-
-        conn.commit()
-        conn.close()
+        db.create_lottery(prize)
 
         embed = discord.Embed(
             title="🎟️ Lottery Created",
             description=(
-                f"Lottery ID: `{lottery_id}`\n"
-                f"Prize: **{db.format_peso(prize)}**\n"
-                f"Ends: <t:{ends_at}:R>"
+                f"Prize: **{db.format_peso(prize)}**\n\n"
+                f"Players can now join using lottery tickets."
             ),
             color=WHITE,
         )
@@ -159,7 +82,7 @@ class Lottery(commands.Cog):
 
     @lottery_group.command(
         name="draw",
-        description="Draw the lottery."
+        description="Draw the lottery.",
     )
     async def draw_lottery(
         self,
@@ -168,52 +91,23 @@ class Lottery(commands.Cog):
         if interaction.user.id != OWNER_ID:
             await interaction.response.send_message(
                 "❌ Owner only.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
-        conn = get_conn()
-
-        lottery = conn.execute(
-            """
-            SELECT *
-            FROM lotteries
-            WHERE active = 1
-            """
-        ).fetchone()
+        lottery = db.get_lottery()
 
         if lottery is None:
-            conn.close()
-
             await interaction.response.send_message(
                 "❌ No active lottery.",
-                ephemeral=True
-            )
-            return
-
-        if lottery["ends_at"] > int(time.time()):
-            conn.close()
-
-            await interaction.response.send_message(
-                f"⏳ Lottery ends <t:{lottery['ends_at']}:R>.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
         entries = db.get_lottery_entries()
 
         if not entries:
-            conn.execute(
-                """
-                UPDATE lotteries
-                SET active = 0
-                WHERE id = ?
-                """,
-                (lottery["id"],)
-            )
-
-            conn.commit()
-            conn.close()
+            db.end_lottery()
 
             await interaction.response.send_message(
                 "❌ Nobody joined the lottery."
@@ -231,36 +125,20 @@ class Lottery(commands.Cog):
 
         db.add_balance(
             winner_id,
-            lottery["prize"]
+            lottery["prize"],
         )
 
-        conn.execute(
-            """
-            DELETE FROM lottery_entries
-            """
-        )
-
-        conn.execute(
-            """
-            UPDATE lotteries
-            SET active = 0
-            WHERE id = ?
-            """,
-            (lottery["id"],)
-        )
-
-        conn.commit()
-        conn.close()
+        db.end_lottery()
 
         embed = discord.Embed(
             title="🎉 Lottery Winner",
-            color=WHITE
+            color=WHITE,
         )
 
         embed.add_field(
             name="Winner",
             value=f"<@{winner_id}>",
-            inline=False
+            inline=False,
         )
 
         embed.add_field(
@@ -268,7 +146,7 @@ class Lottery(commands.Cog):
             value=db.format_peso(
                 lottery["prize"]
             ),
-            inline=False
+            inline=False,
         )
 
         await interaction.response.send_message(
@@ -282,11 +160,15 @@ async def setup(bot):
     await bot.add_cog(cog)
 
     try:
-        bot.tree.add_command(cog.create_group)
+        bot.tree.add_command(
+            cog.create_group
+        )
     except app_commands.CommandAlreadyRegistered:
         pass
 
     try:
-        bot.tree.add_command(cog.lottery_group)
+        bot.tree.add_command(
+            cog.lottery_group
+        )
     except app_commands.CommandAlreadyRegistered:
         pass
