@@ -22,6 +22,15 @@ LOAN_INTEREST_RATE = 0.20
 LOAN_DUE_DAYS = 7
 LOAN_REQUEST_TIMEOUT_SECONDS = 60
 
+# Every full LOAN_ESCALATION_INTERVAL_SECONDS a loan stays overdue,
+# its remaining balance gets hit with another penalty, and that
+# penalty rate itself grows each time it's applied. Escalation stops
+# once LOAN_MAX_ESCALATIONS has been reached, so remaining balances
+# can't blow up forever.
+LOAN_ESCALATION_INTERVAL_SECONDS = 24 * 60 * 60  # once per day overdue
+LOAN_ESCALATION_RATE_STEP = 0.05  # +5% penalty rate per escalation
+LOAN_MAX_ESCALATIONS = 52  # hard cap so this can't run away
+
 
 def ensure_loans_table():
     conn = get_conn()
@@ -36,13 +45,102 @@ def ensure_loans_table():
             remaining INTEGER NOT NULL,
             due_date INTEGER NOT NULL,
             status TEXT NOT NULL DEFAULT 'active',
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            overdue_count INTEGER NOT NULL DEFAULT 0,
+            last_escalated_at INTEGER
         )
         """
     )
 
+    # Migrate databases created before the overdue-escalation columns
+    # existed, so this doesn't break on existing installs.
+    existing_cols = {
+        row["name"] for row in conn.execute("PRAGMA table_info(loans)")
+    }
+
+    if "overdue_count" not in existing_cols:
+        conn.execute(
+            "ALTER TABLE loans ADD COLUMN overdue_count INTEGER NOT NULL DEFAULT 0"
+        )
+
+    if "last_escalated_at" not in existing_cols:
+        conn.execute(
+            "ALTER TABLE loans ADD COLUMN last_escalated_at INTEGER"
+        )
+
     conn.commit()
     conn.close()
+
+
+def is_overdue(loan) -> bool:
+    """True if this loan is active and past its due date."""
+    return loan["status"] == "active" and loan["due_date"] < int(time.time())
+
+
+def current_penalty_rate(overdue_count: int) -> float:
+    """The interest rate that would be applied on the next escalation."""
+    return LOAN_INTEREST_RATE + overdue_count * LOAN_ESCALATION_RATE_STEP
+
+
+def escalate_if_overdue(conn, loan):
+    """
+    If `loan` is active and past due, apply compounding interest for
+    every full LOAN_ESCALATION_INTERVAL_SECONDS it's been overdue since
+    the last escalation (or since the due date, if never escalated).
+
+    Each escalation increases both the remaining balance AND the rate
+    used for the *next* escalation, so interest keeps getting worse the
+    longer someone avoids paying. Returns the (possibly updated) loan
+    row, re-fetched from the DB if a change was made.
+    """
+    if loan["status"] != "active":
+        return loan
+
+    now = int(time.time())
+
+    if now < loan["due_date"]:
+        return loan
+
+    overdue_count = loan["overdue_count"]
+
+    if overdue_count >= LOAN_MAX_ESCALATIONS:
+        return loan
+
+    last_point = loan["last_escalated_at"] or loan["due_date"]
+    periods = (now - last_point) // LOAN_ESCALATION_INTERVAL_SECONDS
+
+    if periods <= 0:
+        return loan
+
+    periods = min(periods, LOAN_MAX_ESCALATIONS - overdue_count)
+
+    remaining = loan["remaining"]
+
+    for _ in range(periods):
+        overdue_count += 1
+        rate = current_penalty_rate(overdue_count - 1)
+        remaining = round(remaining * (1 + rate))
+
+    new_last_escalated_at = last_point + periods * LOAN_ESCALATION_INTERVAL_SECONDS
+
+    conn.execute(
+        """
+        UPDATE loans
+        SET remaining = ?,
+            overdue_count = ?,
+            last_escalated_at = ?
+        WHERE id = ?
+        """,
+        (remaining, overdue_count, new_last_escalated_at, loan["id"]),
+    )
+    conn.commit()
+
+    loan = conn.execute(
+        "SELECT * FROM loans WHERE id = ?",
+        (loan["id"],),
+    ).fetchone()
+
+    return loan
 
 
 class LoanRequestView(discord.ui.View):
@@ -166,9 +264,11 @@ class LoanRequestView(discord.ui.View):
                 remaining,
                 due_date,
                 status,
-                created_at
+                created_at,
+                overdue_count,
+                last_escalated_at
             )
-            VALUES (?, ?, ?, ?, ?, 'active', ?)
+            VALUES (?, ?, ?, ?, ?, 'active', ?, 0, NULL)
             """,
             (
                 str(self.lender.id),
@@ -297,6 +397,46 @@ class Social(commands.Cog):
             )
             return
 
+        conn = get_conn()
+
+        active_loans = conn.execute(
+            """
+            SELECT *
+            FROM loans
+            WHERE borrower = ?
+            AND status = 'active'
+            """,
+            (borrower_id,),
+        ).fetchall()
+
+        overdue_loans = []
+
+        for loan_row in active_loans:
+            loan_row = escalate_if_overdue(conn, loan_row)
+
+            if is_overdue(loan_row):
+                overdue_loans.append(loan_row)
+
+        conn.close()
+
+        if overdue_loans:
+            lines = [
+                f"`{l['id']}`: **{db.format_peso(l['remaining'])}** owed to "
+                f"<@{l['lender']}> — overdue <t:{l['due_date']}:R>, "
+                f"escalated {l['overdue_count']}x "
+                f"(current penalty rate: {current_penalty_rate(l['overdue_count']) * 100:.0f}%)"
+                for l in overdue_loans
+            ]
+
+            await interaction.response.send_message(
+                "Hindi ka puwedeng umutang, may overdue ka pa:\n"
+                + "\n".join(lines)
+                + "\n\nBayaran mo muna gamit ang `/utang pay` — "
+                "mas tumataas pa ang tubo habang hindi bayad.",
+                ephemeral=True,
+            )
+            return
+
         principal = int(amount)
         total_due = round(principal * (1 + LOAN_INTEREST_RATE))
         due_dt = datetime.now(timezone.utc) + timedelta(days=LOAN_DUE_DAYS)
@@ -383,6 +523,8 @@ class Social(commands.Cog):
             )
             return
 
+        loan = escalate_if_overdue(conn, loan)
+
         borrower_user = db.get_user(
             borrower_id
         )
@@ -440,15 +582,24 @@ class Social(commands.Cog):
             pay_amount,
         )
 
+        description = (
+            f"Loan ID: `{loan_id}`\n"
+            f"Lender: <@{loan['lender']}>\n"
+            f"Paid: **{db.format_peso(pay_amount)}**\n"
+            f"Remaining: **{db.format_peso(new_remaining)}**"
+        )
+
+        if loan["overdue_count"] > 0 and new_remaining > 0:
+            description += (
+                f"\n\n⚠️ Na-escalate na ang loan na ito ng "
+                f"{loan['overdue_count']}x dahil sa late payment. "
+                f"Kung hindi pa rin mabayaran, tuloy-tuloy pa ang tubo."
+            )
+
         embed = discord.Embed(
             title="Bayad Utang",
             color=WHITE,
-            description=(
-                f"Loan ID: `{loan_id}`\n"
-                f"Lender: <@{loan['lender']}>\n"
-                f"Paid: **{db.format_peso(pay_amount)}**\n"
-                f"Remaining: **{db.format_peso(new_remaining)}**"
-            ),
+            description=description,
         )
 
         await interaction.response.send_message(
@@ -490,6 +641,9 @@ class Social(commands.Cog):
             (user_id,),
         ).fetchall()
 
+        borrowed = [escalate_if_overdue(conn, loan) for loan in borrowed]
+        lent = [escalate_if_overdue(conn, loan) for loan in lent]
+
         conn.close()
 
         embed = discord.Embed(
@@ -498,12 +652,20 @@ class Social(commands.Cog):
         )
 
         if borrowed:
-            lines = [
-                f"`{loan['id']}` To <@{loan['lender']}>: "
-                f"**{db.format_peso(loan['remaining'])}** "
-                f"(due <t:{loan['due_date']}:R>)"
-                for loan in borrowed
-            ]
+            lines = []
+
+            for loan in borrowed:
+                line = (
+                    f"`{loan['id']}` To <@{loan['lender']}>: "
+                    f"**{db.format_peso(loan['remaining'])}** "
+                    f"(due <t:{loan['due_date']}:R>)"
+                )
+
+                if is_overdue(loan):
+                    line += f" ⚠️ OVERDUE, escalated {loan['overdue_count']}x"
+
+                lines.append(line)
+
             embed.add_field(
                 name="You owe",
                 value="\n".join(lines),
@@ -517,12 +679,20 @@ class Social(commands.Cog):
             )
 
         if lent:
-            lines = [
-                f"`{loan['id']}` From <@{loan['borrower']}>: "
-                f"**{db.format_peso(loan['remaining'])}** "
-                f"(due <t:{loan['due_date']}:R>)"
-                for loan in lent
-            ]
+            lines = []
+
+            for loan in lent:
+                line = (
+                    f"`{loan['id']}` From <@{loan['borrower']}>: "
+                    f"**{db.format_peso(loan['remaining'])}** "
+                    f"(due <t:{loan['due_date']}:R>)"
+                )
+
+                if is_overdue(loan):
+                    line += f" ⚠️ OVERDUE, escalated {loan['overdue_count']}x"
+
+                lines.append(line)
+
             embed.add_field(
                 name="Owed to you",
                 value="\n".join(lines),
@@ -558,6 +728,9 @@ class Social(commands.Cog):
             (loan_id,),
         ).fetchone()
 
+        if loan is not None:
+            loan = escalate_if_overdue(conn, loan)
+
         conn.close()
 
         if loan is None:
@@ -574,16 +747,29 @@ class Social(commands.Cog):
             )
             return
 
+        description = (
+            f"Lender: <@{loan['lender']}>\n"
+            f"Borrower: <@{loan['borrower']}>\n"
+            f"Principal: **{db.format_peso(loan['principal'])}**\n"
+            f"Remaining: **{db.format_peso(loan['remaining'])}**\n"
+            f"Due: <t:{loan['due_date']}:D>\n"
+            f"Status: `{loan['status']}`"
+        )
+
+        if loan["overdue_count"] > 0:
+            description += (
+                f"\n\n⚠️ Escalated {loan['overdue_count']}x due to late payment."
+            )
+
+            if loan["status"] == "active":
+                description += (
+                    f"\nNext penalty rate: "
+                    f"{current_penalty_rate(loan['overdue_count']) * 100:.0f}%"
+                )
+
         embed = discord.Embed(
             title=f"Loan #{loan['id']}",
-            description=(
-                f"Lender: <@{loan['lender']}>\n"
-                f"Borrower: <@{loan['borrower']}>\n"
-                f"Principal: **{db.format_peso(loan['principal'])}**\n"
-                f"Remaining: **{db.format_peso(loan['remaining'])}**\n"
-                f"Due: <t:{loan['due_date']}:D>\n"
-                f"Status: `{loan['status']}`"
-            ),
+            description=description,
             color=WHITE,
         )
 
