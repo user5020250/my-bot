@@ -69,26 +69,23 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS lottery (
-    id INTEGER PRIMARY KEY,
-    prize INTEGER NOT NULL,
-    active INTEGER NOT NULL DEFAULT 1
-);
+            id INTEGER PRIMARY KEY,
+            prize INTEGER NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1
+        );
 
-conn.execute(
-    """
-    CREATE TABLE IF NOT EXISTS lotteries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        prize INTEGER NOT NULL,
-        ends_at INTEGER NOT NULL,
-        created_by TEXT NOT NULL
-    )
-    """
-)
+        CREATE TABLE IF NOT EXISTS lotteries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            prize INTEGER NOT NULL,
+            ends_at INTEGER NOT NULL,
+            created_by TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1
+        );
 
-CREATE TABLE IF NOT EXISTS lottery_entries (
-    user_id TEXT PRIMARY KEY,
-    tickets INTEGER NOT NULL DEFAULT 0
-);
+        CREATE TABLE IF NOT EXISTS lottery_entries (
+            user_id TEXT PRIMARY KEY,
+            tickets INTEGER NOT NULL DEFAULT 0
+        );
 
         CREATE TABLE IF NOT EXISTS debts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,12 +150,18 @@ CREATE TABLE IF NOT EXISTS lottery_entries (
         ).fetchall()
     }
 
+    lottery_columns = {
+        row["name"]
+        for row in conn.execute(
+            "PRAGMA table_info(lotteries)"
+        ).fetchall()
+    }
+
     if "last_sideline" not in user_columns:
         conn.execute(
             """
             ALTER TABLE users
-            ADD COLUMN last_sideline
-            INTEGER NOT NULL DEFAULT 0
+            ADD COLUMN last_sideline INTEGER NOT NULL DEFAULT 0
             """
         )
 
@@ -166,8 +169,7 @@ CREATE TABLE IF NOT EXISTS lottery_entries (
         conn.execute(
             """
             ALTER TABLE users
-            ADD COLUMN last_daily
-            INTEGER NOT NULL DEFAULT 0
+            ADD COLUMN last_daily INTEGER NOT NULL DEFAULT 0
             """
         )
 
@@ -175,8 +177,7 @@ CREATE TABLE IF NOT EXISTS lottery_entries (
         conn.execute(
             """
             ALTER TABLE users
-            ADD COLUMN last_weekly
-            INTEGER NOT NULL DEFAULT 0
+            ADD COLUMN last_weekly INTEGER NOT NULL DEFAULT 0
             """
         )
 
@@ -184,8 +185,7 @@ CREATE TABLE IF NOT EXISTS lottery_entries (
         conn.execute(
             """
             ALTER TABLE users
-            ADD COLUMN last_monthly
-            INTEGER NOT NULL DEFAULT 0
+            ADD COLUMN last_monthly INTEGER NOT NULL DEFAULT 0
             """
         )
 
@@ -193,8 +193,7 @@ CREATE TABLE IF NOT EXISTS lottery_entries (
         conn.execute(
             """
             ALTER TABLE users
-            ADD COLUMN last_yearly
-            INTEGER NOT NULL DEFAULT 0
+            ADD COLUMN last_yearly INTEGER NOT NULL DEFAULT 0
             """
         )
 
@@ -202,8 +201,15 @@ CREATE TABLE IF NOT EXISTS lottery_entries (
         conn.execute(
             """
             ALTER TABLE inventory
-            ADD COLUMN avg_buy_price
-            INTEGER NOT NULL DEFAULT 0
+            ADD COLUMN avg_buy_price INTEGER NOT NULL DEFAULT 0
+            """
+        )
+
+    if "active" not in lottery_columns:
+        conn.execute(
+            """
+            ALTER TABLE lotteries
+            ADD COLUMN active INTEGER NOT NULL DEFAULT 1
             """
         )
 
