@@ -317,8 +317,9 @@ async def buy(
 
         await interaction.response.send_message(
             (
-                f"❌ Only `{stock}` "
-                f"`{shop_item['name']}` left in stock."
+                f"❌ There are only "
+                f"`{stock}` "
+                f"`{shop_item['name']}` left."
             ),
             ephemeral=True,
         )
@@ -421,7 +422,7 @@ async def buy(
     await interaction.response.send_message(
         embed=embed
     )
-
+    
 async def setup(bot):
     await bot.add_cog(
         Shop(bot)
