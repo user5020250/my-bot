@@ -253,6 +253,45 @@ SHOP_ITEMS = {
 }
 
 
+def parse_qty(raw: str) -> int | None:
+    """
+    Parse a quantity string that may use shorthand suffixes,
+    e.g. "5", "1k", "2.5k", "1m", "3b".
+    Returns None if the input isn't a valid positive quantity.
+    """
+    raw = raw.strip().lower().replace(",", "").replace(" ", "")
+
+    if not raw:
+        return None
+
+    multipliers = {
+        "k": 1_000,
+        "m": 1_000_000,
+        "b": 1_000_000_000,
+    }
+
+    suffix = raw[-1]
+
+    if suffix in multipliers:
+        number_part = raw[:-1]
+        multiplier = multipliers[suffix]
+    else:
+        number_part = raw
+        multiplier = 1
+
+    try:
+        value = float(number_part) * multiplier
+    except ValueError:
+        return None
+
+    qty = int(value)
+
+    if qty < 1:
+        return None
+
+    return qty
+
+
 def get_protected_until(user_id: str) -> int:
     conn = get_conn()
 
@@ -508,13 +547,13 @@ class Shop(commands.Cog):
     )
     @app_commands.describe(
         item="Item to buy",
-        qty="How many to buy",
+        qty="How many to buy (supports shorthand like 1k, 2.5k, 1m, or 'all')",
     )
     async def buy(
         self,
         interaction: discord.Interaction,
         item: str,
-        qty: app_commands.Range[int, 1] = 1,
+        qty: str = "1",
     ):
         item = item.lower()
 
@@ -545,6 +584,35 @@ class Shop(commands.Cog):
             )
             return
 
+        user_id = str(interaction.user.id)
+
+        if qty.strip().lower() == "all":
+            user = db.get_user(user_id)
+            affordable = user["balance"] // shop_item["cost"]
+            qty = min(stock, affordable)
+
+            if qty < 1:
+                await interaction.response.send_message(
+                    (
+                        f"❌ You can't afford any "
+                        f"`{shop_item['name']}` "
+                        f"(`{db.format_peso(shop_item['cost'])}` each)."
+                    ),
+                    ephemeral=True,
+                )
+                return
+        else:
+            parsed_qty = parse_qty(qty)
+
+            if parsed_qty is None:
+                await interaction.response.send_message(
+                    "❌ Invalid quantity. Try something like `5`, `1k`, `2.5k`, or `all`.",
+                    ephemeral=True,
+                )
+                return
+
+            qty = parsed_qty
+
         if qty > stock:
             await interaction.response.send_message(
                 (
@@ -557,8 +625,6 @@ class Shop(commands.Cog):
             return
 
         total_cost = shop_item["cost"] * qty
-
-        user_id = str(interaction.user.id)
 
         user = db.get_user(user_id)
 
@@ -663,13 +729,13 @@ class Shop(commands.Cog):
     )
     @app_commands.describe(
         item="Item to sell",
-        qty="How many to sell",
+        qty="How many to sell (supports shorthand like 1k, 2.5k, 1m, or 'all')",
     )
     async def sell(
         self,
         interaction: discord.Interaction,
         item: str,
-        qty: app_commands.Range[int, 1] = 1,
+        qty: str = "1",
     ):
         item = item.lower()
 
@@ -690,6 +756,27 @@ class Shop(commands.Cog):
             return
 
         user_id = str(interaction.user.id)
+
+        if qty.strip().lower() == "all":
+            qty = db.get_inventory_qty(user_id, item)
+
+            if qty < 1:
+                await interaction.response.send_message(
+                    f"❌ You don't own any `{shop_item['name']}`.",
+                    ephemeral=True,
+                )
+                return
+        else:
+            parsed_qty = parse_qty(qty)
+
+            if parsed_qty is None:
+                await interaction.response.send_message(
+                    "❌ Invalid quantity. Try something like `5`, `1k`, `2.5k`, or `all`.",
+                    ephemeral=True,
+                )
+                return
+
+            qty = parsed_qty
 
         if not db.has_item(user_id, item, qty):
             await interaction.response.send_message(
