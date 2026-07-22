@@ -47,6 +47,10 @@ CATEGORIES = [
                 "🎉 /yearly",
                 "`Claim your yearly reward.`",
             ),
+            (
+                "💵 /event setchannel [channe]",
+                "`Set the channel where events will be appear.`",
+            ),
         ],
     ),
 
