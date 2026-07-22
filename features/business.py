@@ -947,7 +947,7 @@ class Business(commands.Cog):
 
     # ---------------------------------------------------------- /business stats
 
-        @business_group.command(
+    @business_group.command(
         name="stats",
         description="Show lifetime earnings, level, and upgrades for a business.",
     )
