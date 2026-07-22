@@ -28,6 +28,10 @@ CATEGORIES = [
                 "`Sing karaoke and earn ₱100–₱1,000. Cooldown: 1 minute.`",
             ),
             (
+                "🧢 /sideline",
+                "`Do a random side hustle and earn ₱150–₱700. Cooldown: 1 minute.`",
+            ),
+            (
                 "💵 /allowance",
                 "`Claim your allowance. Cooldown: 24 hours.`",
             ),
@@ -58,24 +62,78 @@ CATEGORIES = [
                 "`Purchase an item from the shop.`",
             ),
             (
+                "💵 /sell [item]",
+                "`Sell an item back to the shop for half its price.`",
+            ),
+            (
                 "🎒 /inventory",
                 "`View all items you own.`",
             ),
             (
-                "🛡️ /use [item]",
-                "`Use an item from your inventory.`",
+                "🛡️ /use [item] [target]",
+                "`Use an item from your inventory. Target is only required for the Lockpick.`",
+            ),
+            (
+                "💰 /balance [user]",
+                "`Check your balance or another player's balance.`",
             ),
             (
                 "🔒 Padlock",
                 "`Protects you from /steal for 24 hours.`",
             ),
             (
+                "🚨 Alarm System",
+                "`Activates automatically. Gives the thief a longer cooldown if they get caught stealing from you.`",
+            ),
+            (
+                "🛡️ Insurance",
+                "`Activates automatically. Refunds part of the money if you get robbed.`",
+            ),
+            (
+                "🧤 Gloves",
+                "`Use before /steal. Increases your steal success chance for your next attempt.`",
+            ),
+            (
+                "😷 Mask",
+                "`Use before /steal. Lowers your chance of getting caught for your next attempt.`",
+            ),
+            (
+                "🔑 Lockpick",
+                "`Use on another player. 70% chance to break their padlock.`",
+            ),
+            (
+                "⚡ Energy Drink",
+                "`Instantly resets your /work cooldown.`",
+            ),
+            (
+                "🎁 Mystery Cash Box",
+                "`Contains a random amount of cash. Either loses or wins.`",
+            ),
+            (
+                "📦 Mystery Crate",
+                "`Contains a random item — could be a rare collectible or cash.`",
+            ),
+            (
                 "🎟️ Lottery Ticket",
                 "`Consumed automatically when you use /lottery join.`",
             ),
             (
-                "💰 /balance [user]",
-                "`Check your balance or another player's balance.`",
+                "💎 Diamond / 👑 Crown / 🏆 Trophy / 🪙 Ancient Coin",
+                "`Rare collectibles. Can be sold or traded.`",
+            ),
+            (
+                "📜 Trade Permit",
+                "`Required to use /trade. Consumed each time you trade.`",
+            ),
+        ],
+    ),
+
+    (
+        "🤝 Trading",
+        [
+            (
+                "🤝 /trade [user] [item] [qty]",
+                "`Send an item to another player. Requires a Trade Permit.`",
             ),
         ],
     ),
