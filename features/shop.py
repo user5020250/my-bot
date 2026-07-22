@@ -315,7 +315,7 @@ DEFAULT_SHOP_CATEGORY = "general"
 def parse_qty(raw: str) -> int | None:
     """
     Parse a quantity string that may use shorthand suffixes,
-    e.g. "5", "1k", "2.5k", "1m", "3b".
+    e.g. "5", "1k", "2.5k", "1m", "3b", "1t".
     Returns None if the input isn't a valid positive quantity.
     """
     raw = raw.strip().lower().replace(",", "").replace(" ", "")
@@ -327,6 +327,7 @@ def parse_qty(raw: str) -> int | None:
         "k": 1_000,
         "m": 1_000_000,
         "b": 1_000_000_000,
+        "t": 1_000_000_000_000,
     }
 
     suffix = raw[-1]
@@ -652,7 +653,7 @@ class Shop(commands.Cog):
     )
     @app_commands.describe(
         item="Item to buy",
-        qty="How many to buy (supports shorthand like 1k, 2.5k, 1m, or 'all')",
+        qty="How many to buy (supports shorthand like 1k, 1m, 1b, 1t, or 'all')",
     )
     async def buy(
         self,
@@ -711,7 +712,7 @@ class Shop(commands.Cog):
 
             if parsed_qty is None:
                 await interaction.response.send_message(
-                    "❌ Invalid quantity. Try something like `5`, `1k`, `2.5k`, or `all`.",
+                    "❌ Invalid quantity. Try something like `5`, `1k`, `1m`, `1b`, `1t`, or `all`.",
                     ephemeral=True,
                 )
                 return
@@ -834,7 +835,7 @@ class Shop(commands.Cog):
     )
     @app_commands.describe(
         item="Item to sell",
-        qty="How many to sell (supports shorthand like 1k, 2.5k, 1m, or 'all')",
+        qty="How many to sell (supports shorthand like 1k, 1m, 1b, 1t, or 'all')",
     )
     async def sell(
         self,
@@ -876,7 +877,7 @@ class Shop(commands.Cog):
 
             if parsed_qty is None:
                 await interaction.response.send_message(
-                    "❌ Invalid quantity. Try something like `5`, `1k`, `2.5k`, or `all`.",
+                    "❌ Invalid quantity. Try something like `5`, `1k`, `1m`, `1b`, `1t`, or `all`.",
                     ephemeral=True,
                 )
                 return
