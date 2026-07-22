@@ -13,7 +13,7 @@ WHITE = discord.Color(0xFFFFFF)
 
 # How often the background loop wakes up to decide whether to spawn
 # an event in each configured guild.
-EVENT_CHECK_INTERVAL_MINUTES = 5
+EVENT_CHECK_INTERVAL_MINUTES = 30
 
 # Chance, each time the loop wakes up, that a given guild (with a
 # channel set and no active event) actually gets an event this tick.
