@@ -1,327 +1,562 @@
-import discord
+import random
+import time
 
+import discord
 from discord import app_commands
 from discord.ext import commands
 
 import db_utils as db
+from database import get_conn
 
 WHITE = discord.Color(0xFFFFFF)
 
-ITEMS = {
-    # ---------------- Protection ----------------
+PADLOCK_DURATION_SECONDS = 24 * 60 * 60
+SHOP_REFRESH_SECONDS = 5 * 60
 
+SHOP_ITEMS = {
     "padlock": {
-        "emoji": "🔒",
         "name": "Padlock",
+        "emoji": "🔒",
+        "cost": 5000,
         "description": "Protects you from /steal for 24 hours.",
-        "usable": True,
-        "category": "Protection",
+        "min_stock": 1,
+        "max_stock": 3,
+        "sellable": False,
     },
 
+    "lottery_ticket": {
+        "name": "Lottery Ticket",
+        "emoji": "🎟️",
+        "cost": 10_000,
+        "description": "Used automatically when joining lotteries.",
+        "min_stock": 0,
+        "max_stock": 5,
+        "sellable": False,
+    },
+
+    "burger": {
+        "name": "Burger",
+        "emoji": "🍔",
+        "cost": 500,
+        "description": "Just a burger.",
+        "min_stock": 1,
+        "max_stock": 10,
+        "sellable": False,
+    },
+
+    # ---------------- Protection Items ----------------
+
     "alarm_system": {
-        "emoji": "🚨",
         "name": "Alarm System",
-        "description": (
-            "Activates automatically. Gives the "
-            "thief a longer cooldown if caught."
-        ),
-        "usable": False,
-        "category": "Protection",
+        "emoji": "🚨",
+        "cost": 15_000,
+        "description": "Gives the thief a longer cooldown if they get caught stealing from you.",
+        "min_stock": 0,
+        "max_stock": 2,
+        "sellable": True,
     },
 
     "insurance": {
-        "emoji": "🛡️",
         "name": "Insurance",
-        "description": (
-            "Activates automatically. Refunds "
-            "part of the stolen money."
-        ),
-        "usable": False,
-        "category": "Protection",
+        "emoji": "🛡️",
+        "cost": 20_000,
+        "description": "Refunds part of the stolen money if you get robbed.",
+        "min_stock": 0,
+        "max_stock": 2,
+        "sellable": True,
     },
 
-    # ---------------- Crime ----------------
+    # ---------------- Crime Items ----------------
 
     "gloves": {
-        "emoji": "🧤",
         "name": "Gloves",
-        "description": (
-            "Increases steal success chance "
-            "for your next attempt."
-        ),
-        "usable": True,
-        "category": "Crime",
+        "emoji": "🧤",
+        "cost": 3000,
+        "description": "Increases your steal success chance for your next attempt.",
+        "min_stock": 1,
+        "max_stock": 5,
+        "sellable": True,
     },
 
     "mask": {
-        "emoji": "😷",
         "name": "Mask",
-        "description": (
-            "Lowers the chance of getting caught "
-            "for your next steal."
-        ),
-        "usable": True,
-        "category": "Crime",
+        "emoji": "😷",
+        "cost": 3500,
+        "description": "Lowers your chance of getting caught for your next steal.",
+        "min_stock": 1,
+        "max_stock": 5,
+        "sellable": True,
     },
 
     "lockpick": {
-        "emoji": "🔑",
         "name": "Lockpick",
-        "description": (
-            "70% chance to break a target's padlock."
-        ),
-        "usable": True,
-        "category": "Crime",
+        "emoji": "🔑",
+        "cost": 8000,
+        "description": "70% chance to break a target's padlock.",
+        "min_stock": 0,
+        "max_stock": 3,
+        "sellable": True,
     },
 
-    # ---------------- Consumables ----------------
-
-    "burger": {
-        "emoji": "🍔",
-        "name": "Burger",
-        "description": "Just a burger.",
-        "usable": True,
-        "category": "Consumables",
-    },
+    # ---------------- Consumable ----------------
 
     "energy_drink": {
-        "emoji": "⚡",
         "name": "Energy Drink",
+        "emoji": "⚡",
+        "cost": 2000,
         "description": "Lets you work again instantly.",
-        "usable": True,
-        "category": "Consumables",
-    },
-
-    "mystery_cash_box": {
-        "emoji": "🎁",
-        "name": "Mystery Cash Box",
-        "description": (
-            "Contains a random amount of cash. "
-            "Either loses or wins."
-        ),
-        "usable": True,
-        "category": "Consumables",
-    },
-
-    "mystery_crate": {
-        "emoji": "📦",
-        "name": "Mystery Crate",
-        "description": "Contains a random item.",
-        "usable": True,
-        "category": "Consumables",
+        "min_stock": 1,
+        "max_stock": 5,
+        "sellable": True,
     },
 
     # ---------------- Lottery ----------------
 
-    "lottery_ticket": {
-        "emoji": "🎟️",
-        "name": "Lottery Ticket",
-        "description": (
-            "Used automatically "
-            "when joining lotteries."
-        ),
-        "usable": False,
-        "category": "Lottery",
+    "mystery_cash_box": {
+        "name": "Mystery Cash Box",
+        "emoji": "🎁",
+        "cost": 4000,
+        "description": "Contains a random amount of cash. You could win or lose money.",
+        "min_stock": 0,
+        "max_stock": 5,
+        "sellable": True,
     },
 
-    # ---------------- Collectibles ----------------
+    # ---------------- Rare Items ----------------
 
     "diamond": {
-        "emoji": "💎",
         "name": "Diamond",
+        "emoji": "💎",
+        "cost": 50_000,
         "description": "An expensive trade item.",
-        "usable": False,
-        "category": "Collectibles",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
     },
 
     "crown": {
-        "emoji": "👑",
         "name": "Crown",
+        "emoji": "👑",
+        "cost": 75_000,
         "description": "A prestige collectible.",
-        "usable": False,
-        "category": "Collectibles",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
     },
 
     "trophy": {
-        "emoji": "🏆",
         "name": "Trophy",
+        "emoji": "🏆",
+        "cost": 60_000,
         "description": "An event reward.",
-        "usable": False,
-        "category": "Collectibles",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
+    },
+
+    "mystery_crate": {
+        "name": "Mystery Crate",
+        "emoji": "📦",
+        "cost": 12_000,
+        "description": "Contains a random item.",
+        "min_stock": 0,
+        "max_stock": 3,
+        "sellable": True,
     },
 
     "ancient_coin": {
-        "emoji": "🪙",
         "name": "Ancient Coin",
+        "emoji": "🪙",
+        "cost": 90_000,
         "description": "A very rare collectible.",
-        "usable": False,
-        "category": "Collectibles",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
     },
 
     "trade_permit": {
-        "emoji": "📜",
         "name": "Trade Permit",
-        "description": (
-            "Required for trading. Consumed "
-            "each time you trade."
-        ),
-        "usable": False,
-        "category": "Collectibles",
+        "emoji": "📜",
+        "cost": 5000,
+        "description": "Required for trading. Consumed each time you trade.",
+        "min_stock": 0,
+        "max_stock": 1,
+        "sellable": True,
     },
 
-    # ---------------- Resources ----------------
+    # ---------------- Gathered Resources (sell-only) ----------------
+    # These come from /fish, /farm, and /mine in sideline.py.
+    # They are not purchasable and never appear in the shop stock rotation.
 
     "fish": {
-        "emoji": "🐟",
         "name": "Fish",
+        "emoji": "🐟",
+        "sell_price": 400,
         "description": "Caught from /fish.",
-        "usable": False,
-        "category": "Resources",
+        "buyable": False,
+        "sellable": True,
     },
 
     "wheat": {
-        "emoji": "🌾",
         "name": "Wheat",
+        "emoji": "🌾",
+        "sell_price": 30,
         "description": "Harvested from /farm.",
-        "usable": False,
-        "category": "Resources",
+        "buyable": False,
+        "sellable": True,
     },
 
     "copper": {
-        "emoji": "🟠",
         "name": "Copper",
+        "emoji": "🟠",
+        "sell_price": 150,
         "description": "Mined from /mine.",
-        "usable": False,
-        "category": "Resources",
+        "buyable": False,
+        "sellable": True,
     },
 
     "silver": {
-        "emoji": "⚪",
         "name": "Silver",
+        "emoji": "⚪",
+        "sell_price": 2000,
         "description": "Mined from /mine.",
-        "usable": False,
-        "category": "Resources",
+        "buyable": False,
+        "sellable": True,
     },
 
     "gold": {
-        "emoji": "🟡",
         "name": "Gold",
+        "emoji": "🟡",
+        "sell_price": 20_000,
         "description": "Mined from /mine.",
-        "usable": False,
-        "category": "Resources",
+        "buyable": False,
+        "sellable": True,
     },
 
     "raw_diamond": {
-        "emoji": "💎",
         "name": "Raw Diamond",
+        "emoji": "💎",
+        "sell_price": 500_000,
         "description": "Mined from /mine.",
-        "usable": False,
-        "category": "Resources",
+        "buyable": False,
+        "sellable": True,
     },
 
     "obsidian": {
-        "emoji": "⬛",
         "name": "Obsidian",
+        "emoji": "⬛",
+        "sell_price": 1000,
         "description": "Mined from /mine.",
-        "usable": False,
-        "category": "Resources",
+        "buyable": False,
+        "sellable": True,
     },
 }
 
 
-class InventoryDropdown(discord.ui.Select):
+# ---------------- Shop Categories ----------------
+# Controls the dropdown pages shown by /shop. Each entry lists the
+# item ids (from SHOP_ITEMS) that appear on that page, in order.
 
-    def __init__(self, user_id: str):
+SHOP_CATEGORIES = {
+    "general": {
+        "label": "General",
+        "emoji": "🔑",
+        "items": ["padlock", "lottery_ticket", "burger"],
+    },
+    "protection": {
+        "label": "Protection",
+        "emoji": "🛡️",
+        "items": ["alarm_system", "insurance"],
+    },
+    "crime": {
+        "label": "Crime",
+        "emoji": "🦹",
+        "items": ["gloves", "mask", "lockpick"],
+    },
+    "consumables": {
+        "label": "Consumables",
+        "emoji": "⚡",
+        "items": ["energy_drink"],
+    },
+    "lottery_boxes": {
+        "label": "Lottery & Boxes",
+        "emoji": "🎁",
+        "items": ["mystery_cash_box", "mystery_crate"],
+    },
+    "rare": {
+        "label": "Rare Items",
+        "emoji": "💎",
+        "items": [
+            "diamond",
+            "crown",
+            "trophy",
+            "ancient_coin",
+            "trade_permit",
+        ],
+    },
+    "resources": {
+        "label": "Resources",
+        "emoji": "🎒",
+        "items": [
+            "fish",
+            "wheat",
+            "copper",
+            "silver",
+            "gold",
+            "raw_diamond",
+            "obsidian",
+        ],
+    },
+}
 
-        self.user_id = user_id
+DEFAULT_SHOP_CATEGORY = "general"
 
+
+def parse_qty(raw: str) -> int | None:
+    """
+    Parse a quantity string that may use shorthand suffixes,
+    e.g. "5", "1k", "2.5k", "1m", "3b", "1t".
+    Returns None if the input isn't a valid positive quantity.
+    """
+    raw = raw.strip().lower().replace(",", "").replace(" ", "")
+
+    if not raw:
+        return None
+
+    multipliers = {
+        "k": 1_000,
+        "m": 1_000_000,
+        "b": 1_000_000_000,
+        "t": 1_000_000_000_000,
+    }
+
+    suffix = raw[-1]
+
+    if suffix in multipliers:
+        number_part = raw[:-1]
+        multiplier = multipliers[suffix]
+    else:
+        number_part = raw
+        multiplier = 1
+
+    try:
+        value = float(number_part) * multiplier
+    except ValueError:
+        return None
+
+    qty = int(value)
+
+    if qty < 1:
+        return None
+
+    return qty
+
+
+def get_protected_until(user_id: str) -> int:
+    conn = get_conn()
+
+    row = conn.execute(
+        """
+        SELECT protected_until
+        FROM business_status
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+
+    conn.close()
+
+    return row["protected_until"] if row else 0
+
+
+def refresh_item_stock(item_id: str):
+    item = SHOP_ITEMS[item_id]
+
+    stock = random.randint(
+        item["min_stock"],
+        item["max_stock"],
+    )
+
+    now = int(time.time())
+
+    conn = get_conn()
+
+    conn.execute(
+        """
+        INSERT INTO shop_stock (
+            item,
+            stock,
+            last_refresh
+        )
+        VALUES (?, ?, ?)
+
+        ON CONFLICT(item)
+
+        DO UPDATE SET
+            stock = excluded.stock,
+            last_refresh = excluded.last_refresh
+        """,
+        (
+            item_id,
+            stock,
+            now,
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def refresh_shop():
+    now = int(time.time())
+
+    conn = get_conn()
+
+    for item_id, item in SHOP_ITEMS.items():
+
+        # Gathered resources (fish/wheat/ores) aren't part of the
+        # buyable stock rotation, so skip them entirely here.
+        if not item.get("buyable", True):
+            continue
+
+        row = conn.execute(
+            """
+            SELECT last_refresh
+            FROM shop_stock
+            WHERE item = ?
+            """,
+            (item_id,),
+        ).fetchone()
+
+        if row is None:
+            refresh_item_stock(item_id)
+            continue
+
+        elapsed = now - row["last_refresh"]
+
+        if elapsed >= SHOP_REFRESH_SECONDS:
+            refresh_item_stock(item_id)
+
+    conn.close()
+
+
+def get_item_stock(item_id: str) -> int:
+    conn = get_conn()
+
+    row = conn.execute(
+        """
+        SELECT stock
+        FROM shop_stock
+        WHERE item = ?
+        """,
+        (item_id,),
+    ).fetchone()
+
+    conn.close()
+
+    if row is None:
+        return 0
+
+    return row["stock"]
+
+
+def remove_stock(item_id: str):
+    conn = get_conn()
+
+    conn.execute(
+        """
+        UPDATE shop_stock
+        SET stock = stock - 1
+        WHERE item = ?
+        """,
+        (item_id,),
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def build_shop_embed(category_key: str) -> discord.Embed:
+    """
+    Build the embed for a single shop category page
+    (the page shown depends on the dropdown selection).
+    """
+    refresh_shop()
+
+    category = SHOP_CATEGORIES[category_key]
+
+    embed = discord.Embed(
+        title=f"{category['emoji']} {category['label']}",
+        description=(
+            "Use `/buy <item> <qty>`.\n"
+            "Use `/sell <item> <qty>` to sell items back."
+        ),
+        color=WHITE,
+    )
+
+    for item_id in category["items"]:
+        item = SHOP_ITEMS[item_id]
+
+        if not item.get("buyable", True):
+            # Gathered resources: no price/stock, just a sell price.
+            embed.add_field(
+                name=f"{item['emoji']} {item['name']}",
+                value=(
+                    f"Sell Price: `{db.format_peso(item['sell_price'])}`\n"
+                    f"{item['description']}\n"
+                    f"ID: `{item_id}`"
+                ),
+                inline=False,
+            )
+            continue
+
+        stock = get_item_stock(item_id)
+
+        embed.add_field(
+            name=f"{item['emoji']} {item['name']}",
+            value=(
+                f"Price: `{db.format_peso(item['cost'])}`\n"
+                f"Stock: `{stock}`\n"
+                f"{item['description']}\n"
+                f"ID: `{item_id}`"
+            ),
+            inline=False,
+        )
+
+    embed.set_footer(
+        text="Stock refreshes every `5 minutes`."
+    )
+
+    return embed
+
+
+class ShopCategorySelect(discord.ui.Select):
+    def __init__(self):
         options = [
             discord.SelectOption(
-                label="Protection",
-                emoji="🛡️",
-            ),
-            discord.SelectOption(
-                label="Crime",
-                emoji="🔪",
-            ),
-            discord.SelectOption(
-                label="Consumables",
-                emoji="🍔",
-            ),
-            discord.SelectOption(
-                label="Lottery",
-                emoji="🎟️",
-            ),
-            discord.SelectOption(
-                label="Collectibles",
-                emoji="💎",
-            ),
-            discord.SelectOption(
-                label="Resources",
-                emoji="⛏️",
-            ),
+                label=category["label"],
+                value=key,
+                emoji=category["emoji"],
+                default=(key == DEFAULT_SHOP_CATEGORY),
+            )
+            for key, category in SHOP_CATEGORIES.items()
         ]
 
         super().__init__(
             placeholder="Choose a category...",
             options=options,
+            min_values=1,
+            max_values=1,
         )
 
-    async def callback(
-        self,
-        interaction: discord.Interaction,
-    ):
+    async def callback(self, interaction: discord.Interaction):
+        category_key = self.values[0]
 
-        category = self.values[0]
+        # Keep the dropdown showing the currently selected category.
+        for option in self.options:
+            option.default = (option.value == category_key)
 
-        inventory = db.get_all_inventory(
-            self.user_id
-        )
-
-        embed = discord.Embed(
-            title=f"🎒 {category}",
-            color=WHITE,
-        )
-
-        found = False
-
-        for row in inventory:
-
-            item_id = row["item"]
-
-            item = ITEMS.get(item_id)
-
-            if not item:
-                continue
-
-            if item["category"] != category:
-                continue
-
-            found = True
-
-            status = (
-                "🟢 Usable"
-                if item["usable"]
-                else "🔴 Not usable"
-            )
-
-            embed.add_field(
-                name=(
-                    f"{item['emoji']} "
-                    f"{item['name']} "
-                    f"`{status}`"
-                ),
-                value=(
-                    f"`Qty: {row['qty']}`\n"
-                    f"{item['description']}"
-                ),
-                inline=False,
-            )
-
-        if not found:
-            embed.description = (
-                "You don't own any items in this category."
-            )
+        embed = build_shop_embed(category_key)
 
         await interaction.response.edit_message(
             embed=embed,
@@ -329,60 +564,403 @@ class InventoryDropdown(discord.ui.Select):
         )
 
 
-class InventoryView(discord.ui.View):
-
-    def __init__(self, user_id: str):
-
-        super().__init__(timeout=300)
-
-        self.add_item(
-            InventoryDropdown(user_id)
-        )
+class ShopView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.add_item(ShopCategorySelect())
 
 
-class Inventory(commands.Cog):
-
-    def __init__(
-        self,
-        bot: commands.Bot,
-    ):
+class Shop(commands.Cog):
+    def __init__(self, bot):
         self.bot = bot
 
+    # ==========================
+    # /balance
+    # ==========================
+
     @app_commands.command(
-        name="inventory",
-        description="View everything you own.",
+        name="balance",
+        description="Check your balance.",
     )
-    async def inventory(
+    async def balance(
         self,
         interaction: discord.Interaction,
+        member: discord.Member | None = None,
     ):
+        member = member or interaction.user
+
+        user = db.get_user(str(member.id))
 
         embed = discord.Embed(
-            title=(
-                f"🎒 "
-                f"{interaction.user.display_name}'s Inventory"
-            ),
-            description=(
-                "Choose a category below."
-            ),
+            title=f"{member.display_name}'s Balance",
             color=WHITE,
         )
 
-        embed.set_footer(
-            text="Use /use <item> to use usable items."
+        embed.set_thumbnail(
+            url=member.display_avatar.url
         )
+
+        embed.add_field(
+            name="💰 Wallet",
+            value=f"`{db.format_peso(user['balance'])}`",
+            inline=False,
+        )
+
+        protected_until = get_protected_until(
+            str(member.id)
+        )
+
+        now = int(time.time())
+
+        if protected_until > now:
+            embed.add_field(
+                name="🔒 Padlock",
+                value=f"`{db.format_duration(protected_until - now)}`",
+                inline=False,
+            )
+
+        await interaction.response.send_message(
+            embed=embed
+        )
+
+    # ==========================
+    # /shop
+    # ==========================
+
+    @app_commands.command(
+        name="shop",
+        description="Browse the shop.",
+    )
+    async def shop(
+        self,
+        interaction: discord.Interaction,
+    ):
+        embed = build_shop_embed(DEFAULT_SHOP_CATEGORY)
+        view = ShopView()
 
         await interaction.response.send_message(
             embed=embed,
-            view=InventoryView(
-                str(interaction.user.id)
+            view=view,
+        )
+
+    # ==========================
+    # /buy
+    # ==========================
+
+    @app_commands.command(
+        name="buy",
+        description="Buy an item.",
+    )
+    @app_commands.describe(
+        item="Item to buy",
+        qty="How many to buy (supports shorthand like 1k, 1m, 1b, 1t, or 'all')",
+    )
+    async def buy(
+        self,
+        interaction: discord.Interaction,
+        item: str,
+        qty: str = "1",
+    ):
+        item = item.lower()
+
+        refresh_shop()
+
+        if item not in SHOP_ITEMS:
+            await interaction.response.send_message(
+                "❌ Item not found.",
+                ephemeral=True,
+            )
+            return
+
+        shop_item = SHOP_ITEMS[item]
+
+        if not shop_item.get("buyable", True):
+            await interaction.response.send_message(
+                "❌ This item can't be bought — go gather it instead.",
+                ephemeral=True,
+            )
+            return
+
+        stock = get_item_stock(item)
+
+        if stock <= 0:
+            await interaction.response.send_message(
+                "❌ This item is out of stock.",
+                ephemeral=True,
+            )
+            return
+
+        user_id = str(interaction.user.id)
+
+        if qty.strip().lower() == "all":
+            user = db.get_user(user_id)
+            affordable = user["balance"] // shop_item["cost"]
+            qty = min(stock, affordable)
+
+            if qty < 1:
+                await interaction.response.send_message(
+                    (
+                        f"❌ You can't afford any "
+                        f"`{shop_item['name']}` "
+                        f"(`{db.format_peso(shop_item['cost'])}` each)."
+                    ),
+                    ephemeral=True,
+                )
+                return
+        else:
+            parsed_qty = parse_qty(qty)
+
+            if parsed_qty is None:
+                await interaction.response.send_message(
+                    "❌ Invalid quantity. Try something like `5`, `1k`, `1m`, `1b`, `1t`, or `all`.",
+                    ephemeral=True,
+                )
+                return
+
+            qty = parsed_qty
+
+        if qty > stock:
+            await interaction.response.send_message(
+                (
+                    f"❌ There are only "
+                    f"`{stock}` "
+                    f"`{shop_item['name']}` left."
+                ),
+                ephemeral=True,
+            )
+            return
+
+        total_cost = shop_item["cost"] * qty
+
+        user = db.get_user(user_id)
+
+        if user["balance"] < total_cost:
+            await interaction.response.send_message(
+                (
+                    f"❌ You need "
+                    f"`{db.format_peso(total_cost)}`.\n"
+                    f"Current balance: "
+                    f"`{db.format_peso(user['balance'])}`"
+                ),
+                ephemeral=True,
+            )
+            return
+
+        new_balance = db.add_balance(
+            user_id,
+            -total_cost,
+        )
+
+        db.add_inventory(
+            user_id,
+            item,
+            qty,
+            buy_price=shop_item["cost"],
+        )
+
+        conn = get_conn()
+
+        conn.execute(
+            """
+            UPDATE shop_stock
+            SET stock = stock - ?
+            WHERE item = ?
+            """,
+            (
+                qty,
+                item,
             ),
         )
 
+        conn.commit()
+        conn.close()
 
-async def setup(
-    bot: commands.Bot,
-):
+        embed = discord.Embed(
+            title="🛒 Purchase Complete",
+            color=WHITE,
+        )
+
+        embed.set_thumbnail(
+            url=interaction.user.display_avatar.url
+        )
+
+        embed.add_field(
+            name="📦 Item",
+            value=(
+                f"{shop_item['emoji']} "
+                f"`{shop_item['name']}`"
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="🔢 Quantity",
+            value=f"`{qty}`",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💸 Total Cost",
+            value=f"`{db.format_peso(total_cost)}`",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="📉 Stock Left",
+            value=f"`{stock - qty}`",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💰 New Balance",
+            value=f"`{db.format_peso(new_balance)}`",
+            inline=False,
+        )
+
+        embed.set_footer(
+            text="Use /inventory to see your items."
+        )
+
+        await interaction.response.send_message(
+            embed=embed
+        )
+
+    # ==========================
+    # /sell
+    # ==========================
+
+    @app_commands.command(
+        name="sell",
+        description="Sell an item back to the shop.",
+    )
+    @app_commands.describe(
+        item="Item to sell",
+        qty="How many to sell (supports shorthand like 1k, 1m, 1b, 1t, or 'all')",
+    )
+    async def sell(
+        self,
+        interaction: discord.Interaction,
+        item: str,
+        qty: str = "1",
+    ):
+        item = item.lower()
+
+        if item not in SHOP_ITEMS:
+            await interaction.response.send_message(
+                "❌ Item not found.",
+                ephemeral=True,
+            )
+            return
+
+        shop_item = SHOP_ITEMS[item]
+
+        if not shop_item.get("sellable", False):
+            await interaction.response.send_message(
+                "❌ This item can't be sold.",
+                ephemeral=True,
+            )
+            return
+
+        user_id = str(interaction.user.id)
+
+        if qty.strip().lower() == "all":
+            qty = db.get_inventory_qty(user_id, item)
+
+            if qty < 1:
+                await interaction.response.send_message(
+                    f"❌ You don't own any `{shop_item['name']}`.",
+                    ephemeral=True,
+                )
+                return
+        else:
+            parsed_qty = parse_qty(qty)
+
+            if parsed_qty is None:
+                await interaction.response.send_message(
+                    "❌ Invalid quantity. Try something like `5`, `1k`, `1m`, `1b`, `1t`, or `all`.",
+                    ephemeral=True,
+                )
+                return
+
+            qty = parsed_qty
+
+        if not db.has_item(user_id, item, qty):
+            await interaction.response.send_message(
+                f"❌ You don't own `{qty}` of `{shop_item['name']}`.",
+                ephemeral=True,
+            )
+            return
+
+        # Gathered resources (fish/wheat/ores) have an explicit sell_price
+        # since they have no purchasable "cost" to halve.
+        sell_price = shop_item.get(
+            "sell_price",
+            shop_item.get("cost", 0) // 2,
+        )
+
+        total_earned = sell_price * qty
+
+        db.remove_inventory(
+            user_id,
+            item,
+            qty,
+        )
+
+        new_balance = db.add_balance(
+            user_id,
+            total_earned,
+        )
+
+        embed = discord.Embed(
+            title="💵 Sold",
+            color=WHITE,
+        )
+
+        embed.add_field(
+            name="📦 Item",
+            value=(
+                f"{shop_item['emoji']} "
+                f"`{shop_item['name']}` x{qty}"
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💸 Earned",
+            value=f"`{db.format_peso(total_earned)}`",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="💰 New Balance",
+            value=f"`{db.format_peso(new_balance)}`",
+            inline=False,
+        )
+
+        await interaction.response.send_message(
+            embed=embed
+        )
+
+    @sell.autocomplete("item")
+    async def sell_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ):
+        current = current.lower()
+
+        return [
+            app_commands.Choice(
+                name=item["name"],
+                value=item_id,
+            )
+            for item_id, item in SHOP_ITEMS.items()
+            if item.get("sellable", False)
+            and current in item_id
+        ][:25]
+
+
+async def setup(bot):
     await bot.add_cog(
-        Inventory(bot)
+        Shop(bot)
     )
