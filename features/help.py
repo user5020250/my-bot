@@ -50,6 +50,32 @@ CATEGORIES = [
         ],
     ),
 
+        (
+        "🎮 Activities",
+        [
+            (
+                "🎣 /fish",
+                "`Catch fish that can be sold for ₱100 each.`",
+            ),
+            (
+                "⛏️ /mine",
+                "`Mine for ores such as Copper, Silver, Gold, Diamond, and Obsidian.`",
+            ),
+            (
+                "🌾 /farm",
+                "`Harvest wheat that can be sold for ₱100 each.`",
+            ),
+            (
+                "🏹 /hunt",
+                "`Go hunting and earn between ₱100 and ₱5,000.`",
+            ),
+            (
+                "🍳 /cook",
+                "`Cook food and earn between ₱100 and ₱5,000.`",
+            ),
+        ],
+    ),
+
     (
         "🛒 Shop & Inventory",
         [
