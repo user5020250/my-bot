@@ -189,8 +189,8 @@ class Economy(commands.Cog):
             )
 
             embed = discord.Embed(
-                title="🎉 Scatter",
-                description=f"You won **{db.format_peso(amount)}**.",
+                title="Scatter",
+                description=f"🎉 You won **{db.format_peso(amount)}**.",
                 color=WHITE,
             )
 
@@ -201,8 +201,8 @@ class Economy(commands.Cog):
             )
 
             embed = discord.Embed(
-                title="💀 You Lost",
-                description=f"You lost **{db.format_peso(amount)}**.",
+                title="Scatter",
+                description=f"💀 You lost **{db.format_peso(amount)}**.",
                 color=WHITE,
             )
 
