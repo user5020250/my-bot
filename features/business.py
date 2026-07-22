@@ -15,7 +15,7 @@ WHITE = discord.Color(0xFFFFFF)
 COLLECT_INTERVAL_SECONDS = 24 * 60 * 60  # once per day, like real daily income
 
 UPGRADE_MAX_LEVEL = 5
-UPGRADE_COST_MULTIPLIER = 1
+UPGRADE_COST_MULTIPLIER = 1.25
 UPGRADE_INCOME_BONUS = 0.25
 
 SELL_RETURN_RATE = 0.5
@@ -245,7 +245,7 @@ def income_for_level(base_income: int, level: int) -> int:
 def upgrade_cost(base_price: int, level: int) -> int:
     return round(
         base_price
-        * 0.1
+        * 0.25
         * (UPGRADE_COST_MULTIPLIER ** (level - 1))
     )
 
