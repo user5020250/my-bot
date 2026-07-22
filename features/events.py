@@ -156,6 +156,28 @@ def choose_event_key() -> str:
     return random.choices(keys, weights=weights, k=1)[0]
 
 
+def resolve_event_key(raw: str) -> str | None:
+    """
+    Match free-text input (from the prefix command) to an event key.
+    Accepts the internal key ("lost_wallet") or the display name
+    ("Lost Wallet"), case-insensitively.
+    """
+    normalized = raw.strip().lower().replace(" ", "_")
+
+    if normalized in EVENT_TYPES:
+        return normalized
+
+    for key, event_type in EVENT_TYPES.items():
+        display_normalized = (
+            event_type["name"].strip().lower().replace(" ", "_")
+        )
+
+        if display_normalized == normalized:
+            return key
+
+    return None
+
+
 def build_event_embed(event_key: str, reward: int) -> discord.Embed:
     event_type = EVENT_TYPES[event_key]
 
@@ -385,59 +407,64 @@ class Events(commands.Cog):
         raise error
 
     # ==========================
-    # /event trigger
+    # !trigger (owner-only prefix command)
     # ==========================
 
-    @event_group.command(
+    @commands.command(
         name="trigger",
-        description="Manually start an event now.",
+        help="Manually start an event now. Owner only.",
     )
-    @app_commands.describe(
-        event_type="Choose a specific event, or leave blank for a random one",
-    )
-    @app_commands.choices(
-        event_type=[
-            app_commands.Choice(
-                name=event_type["name"],
-                value=key,
-            )
-            for key, event_type in EVENT_TYPES.items()
-        ]
-    )
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @commands.is_owner()
     async def trigger(
         self,
-        interaction: discord.Interaction,
-        event_type: app_commands.Choice[str] | None = None,
+        ctx: commands.Context,
+        *,
+        event_type: str = None,
     ):
-        guild = interaction.guild
+        guild = ctx.guild
+
+        if guild is None:
+            await ctx.send(
+                "❌ This command can only be used in a server."
+            )
+            return
+
         channel_id = get_event_channel(guild.id)
 
         if channel_id is None:
-            await interaction.response.send_message(
-                "❌ No event channel is set. Use `/event setchannel` first.",
-                ephemeral=True,
+            await ctx.send(
+                "❌ No event channel is set. Use `/event setchannel` first."
             )
             return
 
         if guild.id in self.active_events:
-            await interaction.response.send_message(
-                "❌ There's already an active event — wait for it to be claimed or expire.",
-                ephemeral=True,
+            await ctx.send(
+                "❌ There's already an active event — wait for it to be claimed or expire."
             )
             return
 
         channel = guild.get_channel(channel_id)
 
         if channel is None:
-            await interaction.response.send_message(
+            await ctx.send(
                 "❌ The configured event channel no longer exists. "
-                "Use `/event setchannel` to set a new one.",
-                ephemeral=True,
+                "Use `/event setchannel` to set a new one."
             )
             return
 
-        requested_key = event_type.value if event_type else None
+        requested_key = None
+
+        if event_type:
+            requested_key = resolve_event_key(event_type)
+
+            if requested_key is None:
+                valid = ", ".join(
+                    f"`{et['name']}`" for et in EVENT_TYPES.values()
+                )
+                await ctx.send(
+                    f"❌ Unknown event type. Choose from: {valid}"
+                )
+                return
 
         spawned_key = await self.spawn_event(
             guild,
@@ -446,30 +473,25 @@ class Events(commands.Cog):
         )
 
         if spawned_key is None:
-            await interaction.response.send_message(
-                "❌ Couldn't send the event to that channel — check my permissions there.",
-                ephemeral=True,
+            await ctx.send(
+                "❌ Couldn't send the event to that channel — check my permissions there."
             )
             return
 
-        await interaction.response.send_message(
-            (
-                f"✅ Started a **{EVENT_TYPES[spawned_key]['name']}** "
-                f"event in {channel.mention}!"
-            ),
-            ephemeral=True,
+        await ctx.send(
+            f"✅ Started a **{EVENT_TYPES[spawned_key]['name']}** "
+            f"event in {channel.mention}!"
         )
 
     @trigger.error
     async def trigger_error(
         self,
-        interaction: discord.Interaction,
-        error: app_commands.AppCommandError,
+        ctx: commands.Context,
+        error: commands.CommandError,
     ):
-        if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message(
-                "❌ You need the `Manage Server` permission to do that.",
-                ephemeral=True,
+        if isinstance(error, commands.NotOwner):
+            await ctx.send(
+                "❌ Only the bot owner can use that command."
             )
             return
 
