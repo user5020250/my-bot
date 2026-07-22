@@ -160,10 +160,12 @@ class Sideline(commands.Cog):
             int(time.time()),
         )
 
+        amount = random.randint(1, 5)
+
         db.add_inventory(
             user_id,
             "fish",
-            1,
+            amount,
             buy_price=FISH_SELL_PRICE,
         )
 
@@ -172,7 +174,7 @@ class Sideline(commands.Cog):
         embed = discord.Embed(
             title="🎣 Fishing",
             description=(
-                f"You caught a **fish**!\n\n"
+                f"You caught **{amount} fish**!"
                 f"It's not usable, but you can sell it for "
                 f"**{db.format_peso(FISH_SELL_PRICE)}** each."
             ),
@@ -217,10 +219,12 @@ class Sideline(commands.Cog):
         ores, weights = zip(*ORE_WEIGHTS)
         ore = random.choices(ores, weights=weights, k=1)[0]
 
+        amount = random.randint(1, 5)
+        
         db.add_inventory(
             user_id,
             ore,
-            1,
+            amount,
         )
 
         qty = db.get_inventory_qty(user_id, ore)
@@ -237,7 +241,7 @@ class Sideline(commands.Cog):
         embed = discord.Embed(
             title="⛏️ Mining",
             description=(
-                f"You mined a piece of {emoji} **{ore}**!"
+                f"You mined **{amount}×** {emoji} **{ore.title()}**!"
             ),
             color=WHITE,
         )
@@ -277,10 +281,12 @@ class Sideline(commands.Cog):
             int(time.time()),
         )
 
+        amount = random.randint(1, 5)
+
         db.add_inventory(
             user_id,
             "wheat",
-            1,
+            amount,
             buy_price=WHEAT_SELL_PRICE,
         )
 
@@ -289,7 +295,7 @@ class Sideline(commands.Cog):
         embed = discord.Embed(
             title="🌾 Farming",
             description=(
-                f"You harvested a bundle of **wheat**!\n\n"
+                f"You harvested **{amount} wheat**!"
                 f"It's not usable, but you can sell it for "
                 f"**{db.format_peso(WHEAT_SELL_PRICE)}** each."
             ),
