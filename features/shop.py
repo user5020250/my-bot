@@ -180,7 +180,7 @@ SHOP_ITEMS = {
         "cost": 5000,
         "description": "Required for trading. Consumed each time you trade.",
         "min_stock": 0,
-        "max_stock": 3,
+        "max_stock": 1,
         "sellable": True,
     },
 }
