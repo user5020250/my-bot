@@ -189,7 +189,7 @@ class Economy(commands.Cog):
             )
 
             embed = discord.Embed(
-                title="🎉 You Won",
+                title="🎉 Scatter",
                 description=f"You won **{db.format_peso(amount)}**.",
                 color=WHITE,
             )
