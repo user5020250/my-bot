@@ -21,6 +21,11 @@ _ALLOWED_COOLDOWN_FIELDS = {
     "last_monthly",
     "last_yearly",
     "last_sideline",
+    "last_fish",
+    "last_mine",
+    "last_farm",
+    "last_hunt",
+    "last_cook",
 }
 
 # ==========================================================
@@ -339,7 +344,7 @@ def get_all_lottery_channels() -> list[dict]:
         dict(row)
         for row in rows
     ]
-    
+
 # ==========================================================
 # USERS
 # ==========================================================
