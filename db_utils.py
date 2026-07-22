@@ -36,20 +36,22 @@ def reset_all_cooldowns() -> None:
 
     conn = get_conn()
 
-    fields = ", ".join(
-        f"{field} = 0"
-        for field in _ALLOWED_COOLDOWN_FIELDS
-    )
+    try:
+        fields = ", ".join(
+            f"{field} = 0"
+            for field in _ALLOWED_COOLDOWN_FIELDS
+        )
 
-    conn.execute(
-        f"""
-        UPDATE users
-        SET {fields}
-        """
-    )
+        conn.execute(
+            f"""
+            UPDATE users
+            SET {fields}
+            """
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def reset_user_cooldowns(
@@ -60,22 +62,24 @@ def reset_user_cooldowns(
 
     conn = get_conn()
 
-    fields = ", ".join(
-        f"{field} = 0"
-        for field in _ALLOWED_COOLDOWN_FIELDS
-    )
+    try:
+        fields = ", ".join(
+            f"{field} = 0"
+            for field in _ALLOWED_COOLDOWN_FIELDS
+        )
 
-    conn.execute(
-        f"""
-        UPDATE users
-        SET {fields}
-        WHERE id = ?
-        """,
-        (user_id,),
-    )
+        conn.execute(
+            f"""
+            UPDATE users
+            SET {fields}
+            WHERE id = ?
+            """,
+            (user_id,),
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 # ==========================================================
 # LOTTERY
@@ -88,57 +92,51 @@ def create_lottery(
 
     conn = get_conn()
 
-    conn.execute(
-        """
-        DELETE FROM lottery
-        """
-    )
+    try:
+        conn.execute("DELETE FROM lottery")
+        conn.execute("DELETE FROM lottery_entries")
 
-    conn.execute(
-        """
-        DELETE FROM lottery_entries
-        """
-    )
-
-    conn.execute(
-        """
-        INSERT INTO lottery (
-            id,
-            prize,
-            ends_at,
-            active
+        conn.execute(
+            """
+            INSERT INTO lottery (
+                id,
+                prize,
+                ends_at,
+                active
+            )
+            VALUES (
+                1,
+                ?,
+                ?,
+                1
+            )
+            """,
+            (
+                prize,
+                ends_at,
+            ),
         )
-        VALUES (
-            1,
-            ?,
-            ?,
-            1
-        )
-        """,
-        (
-            prize,
-            ends_at,
-        ),
-    )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_lottery() -> dict | None:
 
     conn = get_conn()
 
-    row = conn.execute(
-        """
-        SELECT *
-        FROM lottery
-        WHERE active = 1
-        LIMIT 1
-        """
-    ).fetchone()
-
-    conn.close()
+    try:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM lottery
+            WHERE active = 1
+            LIMIT 1
+            """
+        ).fetchone()
+    finally:
+        conn.close()
 
     if row is None:
         return None
@@ -150,36 +148,31 @@ def end_lottery() -> None:
 
     conn = get_conn()
 
-    conn.execute(
-        """
-        UPDATE lottery
-        SET active = 0
-        WHERE id = 1
-        """
-    )
+    try:
+        conn.execute(
+            """
+            UPDATE lottery
+            SET active = 0
+            WHERE id = 1
+            """
+        )
 
-    conn.execute(
-        """
-        DELETE FROM lottery_entries
-        """
-    )
+        conn.execute("DELETE FROM lottery_entries")
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def clear_lottery_entries() -> None:
 
     conn = get_conn()
 
-    conn.execute(
-        """
-        DELETE FROM lottery_entries
-        """
-    )
-
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("DELETE FROM lottery_entries")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def join_lottery(
@@ -204,45 +197,47 @@ def join_lottery(
 
     conn = get_conn()
 
-    row = conn.execute(
-        """
-        SELECT tickets
-        FROM lottery_entries
-        WHERE user_id = ?
-        """,
-        (
-            user_id,
-        ),
-    ).fetchone()
+    try:
+        row = conn.execute(
+            """
+            SELECT tickets
+            FROM lottery_entries
+            WHERE user_id = ?
+            """,
+            (
+                user_id,
+            ),
+        ).fetchone()
 
-    current_tickets = 0
+        current_tickets = 0
 
-    if row:
-        current_tickets = row["tickets"]
+        if row:
+            current_tickets = row["tickets"]
 
-    new_total = current_tickets + tickets
+        new_total = current_tickets + tickets
 
-    conn.execute(
-        """
-        INSERT INTO lottery_entries (
-            user_id,
-            tickets
+        conn.execute(
+            """
+            INSERT INTO lottery_entries (
+                user_id,
+                tickets
+            )
+            VALUES (?, ?)
+
+            ON CONFLICT(user_id)
+
+            DO UPDATE SET
+                tickets = excluded.tickets
+            """,
+            (
+                user_id,
+                new_total,
+            ),
         )
-        VALUES (?, ?)
 
-        ON CONFLICT(user_id)
-
-        DO UPDATE SET
-            tickets = excluded.tickets
-        """,
-        (
-            user_id,
-            new_total,
-        ),
-    )
-
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
     remove_inventory(
         user_id,
@@ -257,14 +252,15 @@ def get_lottery_entries() -> list[dict]:
 
     conn = get_conn()
 
-    rows = conn.execute(
-        """
-        SELECT *
-        FROM lottery_entries
-        """
-    ).fetchall()
-
-    conn.close()
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM lottery_entries
+            """
+        ).fetchall()
+    finally:
+        conn.close()
 
     return [
         dict(row)
@@ -279,27 +275,29 @@ def set_lottery_channel(
 
     conn = get_conn()
 
-    conn.execute(
-        """
-        INSERT INTO lottery_channels (
-            guild_id,
-            channel_id
+    try:
+        conn.execute(
+            """
+            INSERT INTO lottery_channels (
+                guild_id,
+                channel_id
+            )
+            VALUES (?, ?)
+
+            ON CONFLICT(guild_id)
+
+            DO UPDATE SET
+                channel_id = excluded.channel_id
+            """,
+            (
+                guild_id,
+                channel_id,
+            ),
         )
-        VALUES (?, ?)
 
-        ON CONFLICT(guild_id)
-
-        DO UPDATE SET
-            channel_id = excluded.channel_id
-        """,
-        (
-            guild_id,
-            channel_id,
-        ),
-    )
-
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_lottery_channel(
@@ -308,18 +306,19 @@ def get_lottery_channel(
 
     conn = get_conn()
 
-    row = conn.execute(
-        """
-        SELECT channel_id
-        FROM lottery_channels
-        WHERE guild_id = ?
-        """,
-        (
-            guild_id,
-        ),
-    ).fetchone()
-
-    conn.close()
+    try:
+        row = conn.execute(
+            """
+            SELECT channel_id
+            FROM lottery_channels
+            WHERE guild_id = ?
+            """,
+            (
+                guild_id,
+            ),
+        ).fetchone()
+    finally:
+        conn.close()
 
     if row is None:
         return None
@@ -331,14 +330,15 @@ def get_all_lottery_channels() -> list[dict]:
 
     conn = get_conn()
 
-    rows = conn.execute(
-        """
-        SELECT *
-        FROM lottery_channels
-        """
-    ).fetchall()
-
-    conn.close()
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM lottery_channels
+            """
+        ).fetchall()
+    finally:
+        conn.close()
 
     return [
         dict(row)
@@ -355,34 +355,7 @@ def get_user(
 
     conn = get_conn()
 
-    row = conn.execute(
-        """
-        SELECT *
-        FROM users
-        WHERE id = ?
-        """,
-        (
-            user_id,
-        ),
-    ).fetchone()
-
-    if row is None:
-        conn.execute(
-            """
-            INSERT INTO users (
-                id,
-                balance
-            )
-            VALUES (?, ?)
-            """,
-            (
-                user_id,
-                STARTING_MONEY,
-            ),
-        )
-
-        conn.commit()
-
+    try:
         row = conn.execute(
             """
             SELECT *
@@ -394,7 +367,35 @@ def get_user(
             ),
         ).fetchone()
 
-    conn.close()
+        if row is None:
+            conn.execute(
+                """
+                INSERT INTO users (
+                    id,
+                    balance
+                )
+                VALUES (?, ?)
+                """,
+                (
+                    user_id,
+                    STARTING_MONEY,
+                ),
+            )
+
+            conn.commit()
+
+            row = conn.execute(
+                """
+                SELECT *
+                FROM users
+                WHERE id = ?
+                """,
+                (
+                    user_id,
+                ),
+            ).fetchone()
+    finally:
+        conn.close()
 
     return dict(row)
 
@@ -413,20 +414,22 @@ def set_balance(
 
     conn = get_conn()
 
-    conn.execute(
-        """
-        UPDATE users
-        SET balance = ?
-        WHERE id = ?
-        """,
-        (
-            amount,
-            user_id,
-        ),
-    )
+    try:
+        conn.execute(
+            """
+            UPDATE users
+            SET balance = ?
+            WHERE id = ?
+            """,
+            (
+                amount,
+                user_id,
+            ),
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
     return amount
 
@@ -455,20 +458,22 @@ def set_job(
 
     conn = get_conn()
 
-    conn.execute(
-        """
-        UPDATE users
-        SET job = ?
-        WHERE id = ?
-        """,
-        (
-            job,
-            user_id,
-        ),
-    )
+    try:
+        conn.execute(
+            """
+            UPDATE users
+            SET job = ?
+            WHERE id = ?
+            """,
+            (
+                job,
+                user_id,
+            ),
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ==========================================================
@@ -486,23 +491,26 @@ def ensure_status_effect_columns() -> None:
 
     conn = get_conn()
 
-    existing_cols = {
-        row["name"] for row in conn.execute("PRAGMA table_info(business_status)")
-    }
+    try:
+        existing_cols = {
+            row["name"] for row in conn.execute("PRAGMA table_info(business_status)")
+        }
 
-    additions = {
-        "gloves_until": "INTEGER NOT NULL DEFAULT 0",
-        "mask_until": "INTEGER NOT NULL DEFAULT 0",
-    }
+        additions = {
+            "protected_until": "INTEGER NOT NULL DEFAULT 0",
+            "gloves_until": "INTEGER NOT NULL DEFAULT 0",
+            "mask_until": "INTEGER NOT NULL DEFAULT 0",
+        }
 
-    for col, decl in additions.items():
-        if col not in existing_cols:
-            conn.execute(
-                f"ALTER TABLE business_status ADD COLUMN {col} {decl}"
-            )
+        for col, decl in additions.items():
+            if col not in existing_cols:
+                conn.execute(
+                    f"ALTER TABLE business_status ADD COLUMN {col} {decl}"
+                )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_business_status(
@@ -511,26 +519,7 @@ def get_business_status(
 
     conn = get_conn()
 
-    row = conn.execute(
-        """
-        SELECT *
-        FROM business_status
-        WHERE user_id = ?
-        """,
-        (user_id,),
-    ).fetchone()
-
-    if row is None:
-        conn.execute(
-            """
-            INSERT INTO business_status (user_id)
-            VALUES (?)
-            """,
-            (user_id,),
-        )
-
-        conn.commit()
-
+    try:
         row = conn.execute(
             """
             SELECT *
@@ -540,7 +529,27 @@ def get_business_status(
             (user_id,),
         ).fetchone()
 
-    conn.close()
+        if row is None:
+            conn.execute(
+                """
+                INSERT INTO business_status (user_id)
+                VALUES (?)
+                """,
+                (user_id,),
+            )
+
+            conn.commit()
+
+            row = conn.execute(
+                """
+                SELECT *
+                FROM business_status
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            ).fetchone()
+    finally:
+        conn.close()
 
     return dict(row)
 
@@ -560,20 +569,22 @@ def set_status_field(
 
     conn = get_conn()
 
-    conn.execute(
-        f"""
-        UPDATE business_status
-        SET {field} = ?
-        WHERE user_id = ?
-        """,
-        (
-            value,
-            user_id,
-        ),
-    )
+    try:
+        conn.execute(
+            f"""
+            UPDATE business_status
+            SET {field} = ?
+            WHERE user_id = ?
+            """,
+            (
+                value,
+                user_id,
+            ),
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ==========================================================
@@ -595,20 +606,22 @@ def set_cooldown(
 
     conn = get_conn()
 
-    conn.execute(
-        f"""
-        UPDATE users
-        SET {field} = ?
-        WHERE id = ?
-        """,
-        (
-            timestamp,
-            user_id,
-        ),
-    )
+    try:
+        conn.execute(
+            f"""
+            UPDATE users
+            SET {field} = ?
+            WHERE id = ?
+            """,
+            (
+                timestamp,
+                user_id,
+            ),
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def check_cooldown(
@@ -656,20 +669,21 @@ def get_inventory(
 
     conn = get_conn()
 
-    row = conn.execute(
-        """
-        SELECT *
-        FROM inventory
-        WHERE user_id = ?
-        AND item = ?
-        """,
-        (
-            user_id,
-            item,
-        ),
-    ).fetchone()
-
-    conn.close()
+    try:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM inventory
+            WHERE user_id = ?
+            AND item = ?
+            """,
+            (
+                user_id,
+                item,
+            ),
+        ).fetchone()
+    finally:
+        conn.close()
 
     if row is None:
         return {
@@ -701,20 +715,21 @@ def get_all_inventory(
 
     conn = get_conn()
 
-    rows = conn.execute(
-        """
-        SELECT *
-        FROM inventory
-        WHERE user_id = ?
-        AND qty > 0
-        ORDER BY qty DESC, item ASC
-        """,
-        (
-            user_id,
-        ),
-    ).fetchall()
-
-    conn.close()
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM inventory
+            WHERE user_id = ?
+            AND qty > 0
+            ORDER BY qty DESC, item ASC
+            """,
+            (
+                user_id,
+            ),
+        ).fetchall()
+    finally:
+        conn.close()
 
     return [
         dict(row)
@@ -783,35 +798,37 @@ def add_inventory(
 
     conn = get_conn()
 
-    conn.execute(
-        """
-        INSERT INTO inventory (
-            user_id,
-            item,
-            qty,
-            avg_buy_price
+    try:
+        conn.execute(
+            """
+            INSERT INTO inventory (
+                user_id,
+                item,
+                qty,
+                avg_buy_price
+            )
+            VALUES (?, ?, ?, ?)
+
+            ON CONFLICT (
+                user_id,
+                item
+            )
+
+            DO UPDATE SET
+                qty = excluded.qty,
+                avg_buy_price = excluded.avg_buy_price
+            """,
+            (
+                user_id,
+                item,
+                new_qty,
+                new_avg,
+            ),
         )
-        VALUES (?, ?, ?, ?)
 
-        ON CONFLICT (
-            user_id,
-            item
-        )
-
-        DO UPDATE SET
-            qty = excluded.qty,
-            avg_buy_price = excluded.avg_buy_price
-        """,
-        (
-            user_id,
-            item,
-            new_qty,
-            new_avg,
-        ),
-    )
-
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
     return new_qty
 
