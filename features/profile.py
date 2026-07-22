@@ -174,7 +174,7 @@ class Profile(commands.Cog):
                 f"`{'Ready' if trabaho_cd == 0 else db.format_duration(trabaho_cd)}`\n"
                 f"Sideline: "
                 f"`{'Ready' if sideline_cd == 0 else db.format_duration(sideline_cd)}`\n"
-                f"Daily Allowance: "
+                f"Allowance: "
                 f"`{'Ready' if baon_cd == 0 else db.format_duration(baon_cd)}`"
             ),
             inline=True,
