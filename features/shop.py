@@ -183,6 +183,73 @@ SHOP_ITEMS = {
         "max_stock": 1,
         "sellable": True,
     },
+
+    # ---------------- Gathered Resources (sell-only) ----------------
+    # These come from /fish, /farm, and /mine in sideline.py.
+    # They are not purchasable and never appear in the shop stock rotation.
+
+    "fish": {
+        "name": "Fish",
+        "emoji": "🐟",
+        "sell_price": 100,
+        "description": "Caught from /fish.",
+        "buyable": False,
+        "sellable": True,
+    },
+
+    "wheat": {
+        "name": "Wheat",
+        "emoji": "🌾",
+        "sell_price": 100,
+        "description": "Harvested from /farm.",
+        "buyable": False,
+        "sellable": True,
+    },
+
+    "copper": {
+        "name": "Copper",
+        "emoji": "🟠",
+        "sell_price": 50,
+        "description": "Mined from /mine.",
+        "buyable": False,
+        "sellable": True,
+    },
+
+    "silver": {
+        "name": "Silver",
+        "emoji": "⚪",
+        "sell_price": 150,
+        "description": "Mined from /mine.",
+        "buyable": False,
+        "sellable": True,
+    },
+
+    "gold": {
+        "name": "Gold",
+        "emoji": "🟡",
+        "sell_price": 400,
+        "description": "Mined from /mine.",
+        "buyable": False,
+        "sellable": True,
+    },
+
+    "raw_diamond": {
+        "name": "Raw Diamond",
+        "emoji": "💎",
+        "sell_price": 1000,
+        "description": "Mined from /mine.",
+        "buyable": False,
+        "sellable": True,
+    },
+
+    "obsidian": {
+        "name": "Obsidian",
+        "emoji": "⬛",
+        "sell_price": 2500,
+        "description": "Mined from /mine.",
+        "buyable": False,
+        "sellable": True,
+    },
 }
 
 
@@ -246,7 +313,12 @@ def refresh_shop():
 
     conn = get_conn()
 
-    for item_id in SHOP_ITEMS:
+    for item_id, item in SHOP_ITEMS.items():
+
+        # Gathered resources (fish/wheat/ores) aren't part of the
+        # buyable stock rotation, so skip them entirely here.
+        if not item.get("buyable", True):
+            continue
 
         row = conn.execute(
             """
@@ -381,7 +453,19 @@ class Shop(commands.Cog):
             color=WHITE,
         )
 
+        resource_lines = []
+
         for item_id, item in SHOP_ITEMS.items():
+
+            if not item.get("buyable", True):
+                # Gathered resources are listed separately below,
+                # since they have no price/stock to buy.
+                resource_lines.append(
+                    f"{item['emoji']} **{item['name']}** — "
+                    f"sells for `{db.format_peso(item['sell_price'])}` "
+                    f"(ID: `{item_id}`)"
+                )
+                continue
 
             stock = get_item_stock(item_id)
 
@@ -396,6 +480,13 @@ class Shop(commands.Cog):
                     f"{item['description']}\n"
                     f"ID: `{item_id}`"
                 ),
+                inline=False,
+            )
+
+        if resource_lines:
+            embed.add_field(
+                name="🎒 Gathered Resources (sell only)",
+                value="\n".join(resource_lines),
                 inline=False,
             )
 
@@ -437,6 +528,13 @@ class Shop(commands.Cog):
             return
 
         shop_item = SHOP_ITEMS[item]
+
+        if not shop_item.get("buyable", True):
+            await interaction.response.send_message(
+                "❌ This item can't be bought — go gather it instead.",
+                ephemeral=True,
+            )
+            return
 
         stock = get_item_stock(item)
 
@@ -600,7 +698,12 @@ class Shop(commands.Cog):
             )
             return
 
-        sell_price = shop_item["cost"] // 2
+        # Gathered resources (fish/wheat/ores) have an explicit sell_price
+        # since they have no purchasable "cost" to halve.
+        sell_price = shop_item.get(
+            "sell_price",
+            shop_item.get("cost", 0) // 2,
+        )
 
         total_earned = sell_price * qty
 
