@@ -1,8 +1,12 @@
 import discord
+
 from discord import app_commands
 from discord.ext import commands
+
 import db_utils as db
+
 WHITE = discord.Color(0xFFFFFF)
+
 ITEMS = {
     "padlock": {
         "emoji": "🔒",
@@ -141,9 +145,15 @@ ITEMS = {
         "usable": False,
     },
 }
+
+
 class Inventory(commands.Cog):
-    def __init__(self, bot):
+    def __init__(
+        self,
+        bot: commands.Bot,
+    ):
         self.bot = bot
+
     @app_commands.command(
         name="inventory",
         description="View everything you own.",
@@ -152,10 +162,14 @@ class Inventory(commands.Cog):
         self,
         interaction: discord.Interaction,
     ):
-        user_id = str(interaction.user.id)
+        user_id = str(
+            interaction.user.id
+        )
+
         items = db.get_all_inventory(
             user_id
         )
+
         embed = discord.Embed(
             title=(
                 f"🎒 "
@@ -163,13 +177,16 @@ class Inventory(commands.Cog):
             ),
             color=WHITE,
         )
+
         if not items:
             embed.description = (
                 "You don't own anything yet."
             )
+
         else:
             for row in items:
                 item_id = row["item"]
+
                 item_data = ITEMS.get(
                     item_id,
                     {
@@ -181,15 +198,18 @@ class Inventory(commands.Cog):
                         "usable": False,
                     },
                 )
+
                 status = (
                     "🟢 Usable"
                     if item_data["usable"]
                     else "🔴 Not usable"
                 )
+
                 embed.add_field(
                     name=(
                         f"{item_data['emoji']} "
                         f"{item_data['name']} "
+                        f"`{item_id}` "
                         f"`{status}`"
                     ),
                     value=(
@@ -198,13 +218,19 @@ class Inventory(commands.Cog):
                     ),
                     inline=False,
                 )
+
         embed.set_footer(
             text="Use `/use <item>` to use usable items."
         )
+
         await interaction.response.send_message(
             embed=embed
         )
-async def setup(bot):
+
+
+async def setup(
+    bot: commands.Bot,
+):
     await bot.add_cog(
         Inventory(bot)
     )
