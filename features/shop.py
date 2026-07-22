@@ -253,6 +253,65 @@ SHOP_ITEMS = {
 }
 
 
+# ---------------- Shop Categories ----------------
+# Controls the dropdown pages shown by /shop. Each entry lists the
+# item ids (from SHOP_ITEMS) that appear on that page, in order.
+
+SHOP_CATEGORIES = {
+    "general": {
+        "label": "General",
+        "emoji": "🔑",
+        "items": ["padlock", "lottery_ticket", "burger"],
+    },
+    "protection": {
+        "label": "Protection",
+        "emoji": "🛡️",
+        "items": ["alarm_system", "insurance"],
+    },
+    "crime": {
+        "label": "Crime",
+        "emoji": "🦹",
+        "items": ["gloves", "mask", "lockpick"],
+    },
+    "consumables": {
+        "label": "Consumables",
+        "emoji": "⚡",
+        "items": ["energy_drink"],
+    },
+    "lottery_boxes": {
+        "label": "Lottery & Boxes",
+        "emoji": "🎁",
+        "items": ["mystery_cash_box", "mystery_crate"],
+    },
+    "rare": {
+        "label": "Rare Items",
+        "emoji": "💎",
+        "items": [
+            "diamond",
+            "crown",
+            "trophy",
+            "ancient_coin",
+            "trade_permit",
+        ],
+    },
+    "resources": {
+        "label": "Resources",
+        "emoji": "🎒",
+        "items": [
+            "fish",
+            "wheat",
+            "copper",
+            "silver",
+            "gold",
+            "raw_diamond",
+            "obsidian",
+        ],
+    },
+}
+
+DEFAULT_SHOP_CATEGORY = "general"
+
+
 def parse_qty(raw: str) -> int | None:
     """
     Parse a quantity string that may use shorthand suffixes,
@@ -416,6 +475,100 @@ def remove_stock(item_id: str):
     conn.close()
 
 
+def build_shop_embed(category_key: str) -> discord.Embed:
+    """
+    Build the embed for a single shop category page
+    (the page shown depends on the dropdown selection).
+    """
+    refresh_shop()
+
+    category = SHOP_CATEGORIES[category_key]
+
+    embed = discord.Embed(
+        title=f"{category['emoji']} {category['label']}",
+        description=(
+            "Use `/buy <item> <qty>`.\n"
+            "Use `/sell <item> <qty>` to sell items back."
+        ),
+        color=WHITE,
+    )
+
+    for item_id in category["items"]:
+        item = SHOP_ITEMS[item_id]
+
+        if not item.get("buyable", True):
+            # Gathered resources: no price/stock, just a sell price.
+            embed.add_field(
+                name=f"{item['emoji']} {item['name']}",
+                value=(
+                    f"Sell Price: `{db.format_peso(item['sell_price'])}`\n"
+                    f"{item['description']}\n"
+                    f"ID: `{item_id}`"
+                ),
+                inline=False,
+            )
+            continue
+
+        stock = get_item_stock(item_id)
+
+        embed.add_field(
+            name=f"{item['emoji']} {item['name']}",
+            value=(
+                f"Price: `{db.format_peso(item['cost'])}`\n"
+                f"Stock: `{stock}`\n"
+                f"{item['description']}\n"
+                f"ID: `{item_id}`"
+            ),
+            inline=False,
+        )
+
+    embed.set_footer(
+        text="Stock refreshes every `5 minutes`."
+    )
+
+    return embed
+
+
+class ShopCategorySelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label=category["label"],
+                value=key,
+                emoji=category["emoji"],
+                default=(key == DEFAULT_SHOP_CATEGORY),
+            )
+            for key, category in SHOP_CATEGORIES.items()
+        ]
+
+        super().__init__(
+            placeholder="Choose a category...",
+            options=options,
+            min_values=1,
+            max_values=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        category_key = self.values[0]
+
+        # Keep the dropdown showing the currently selected category.
+        for option in self.options:
+            option.default = (option.value == category_key)
+
+        embed = build_shop_embed(category_key)
+
+        await interaction.response.edit_message(
+            embed=embed,
+            view=self.view,
+        )
+
+
+class ShopView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
+        self.add_item(ShopCategorySelect())
+
+
 class Shop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -481,60 +634,12 @@ class Shop(commands.Cog):
         self,
         interaction: discord.Interaction,
     ):
-        refresh_shop()
-
-        embed = discord.Embed(
-            title="🛒 Shop",
-            description=(
-                "Use `/buy <item> <qty>`.\n"
-                "Use `/sell <item> <qty>` to sell items back."
-            ),
-            color=WHITE,
-        )
-
-        resource_lines = []
-
-        for item_id, item in SHOP_ITEMS.items():
-
-            if not item.get("buyable", True):
-                # Gathered resources are listed separately below,
-                # since they have no price/stock to buy.
-                resource_lines.append(
-                    f"{item['emoji']} **{item['name']}** — "
-                    f"sells for `{db.format_peso(item['sell_price'])}` "
-                    f"(ID: `{item_id}`)"
-                )
-                continue
-
-            stock = get_item_stock(item_id)
-
-            embed.add_field(
-                name=(
-                    f"{item['emoji']} "
-                    f"{item['name']}"
-                ),
-                value=(
-                    f"Price: `{db.format_peso(item['cost'])}`\n"
-                    f"Stock: `{stock}`\n"
-                    f"{item['description']}\n"
-                    f"ID: `{item_id}`"
-                ),
-                inline=False,
-            )
-
-        if resource_lines:
-            embed.add_field(
-                name="🎒 Gathered Resources (sell only)",
-                value="\n".join(resource_lines),
-                inline=False,
-            )
-
-        embed.set_footer(
-            text="Stock refreshes every `5 minutes`."
-        )
+        embed = build_shop_embed(DEFAULT_SHOP_CATEGORY)
+        view = ShopView()
 
         await interaction.response.send_message(
-            embed=embed
+            embed=embed,
+            view=view,
         )
 
     # ==========================
