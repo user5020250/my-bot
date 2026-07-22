@@ -19,11 +19,14 @@ FISH_SELL_PRICE = 100
 WHEAT_SELL_PRICE = 100
 
 # (ore item, weight) — higher weight = more common
+# Note: the rare ore is "raw_diamond", not "diamond" — the shop already
+# uses "diamond" as its 50,000-peso collectible item, so this avoids
+# mined ore and the purchasable collectible sharing an inventory slot.
 ORE_WEIGHTS = [
     ("copper", 40),
     ("silver", 30),
     ("gold", 18),
-    ("diamond", 8),
+    ("raw_diamond", 8),
     ("obsidian", 4),
 ]
 
@@ -220,7 +223,7 @@ class Sideline(commands.Cog):
         ore = random.choices(ores, weights=weights, k=1)[0]
 
         amount = random.randint(1, 5)
-        
+
         db.add_inventory(
             user_id,
             ore,
@@ -233,20 +236,24 @@ class Sideline(commands.Cog):
             "copper": "🟠",
             "silver": "⚪",
             "gold": "🟡",
-            "diamond": "💎",
+            "raw_diamond": "💎",
             "obsidian": "⬛",
         }
         emoji = ore_emojis.get(ore, "⛏️")
 
+        # "raw_diamond".title() would render as "Raw_Diamond", so
+        # replace underscores with spaces before title-casing.
+        ore_display = ore.replace("_", " ").title()
+
         embed = discord.Embed(
             title="⛏️ Mining",
             description=(
-                f"You mined **{amount}×** {emoji} **{ore.title()}**!"
+                f"You mined **{amount}×** {emoji} **{ore_display}**!"
             ),
             color=WHITE,
         )
         embed.set_footer(
-            text=f"{emoji} {ore.title()} in inventory: {qty}"
+            text=f"{emoji} {ore_display} in inventory: {qty}"
         )
 
         await interaction.response.send_message(embed=embed)
