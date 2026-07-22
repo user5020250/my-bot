@@ -22,6 +22,13 @@ FARM_COOLDOWN_SECONDS = 60
 HUNT_COOLDOWN_SECONDS = 60
 COOK_COOLDOWN_SECONDS = 60
 
+# Mirrors the constants in rewards.py — kept local rather than imported
+# since /profile only needs the durations, not the reward logic.
+DAILY_COOLDOWN_SECONDS = 1 * 24 * 60 * 60
+WEEKLY_COOLDOWN_SECONDS = 7 * 24 * 60 * 60
+MONTHLY_COOLDOWN_SECONDS = 30 * 24 * 60 * 60
+YEARLY_COOLDOWN_SECONDS = 365 * 24 * 60 * 60
+
 
 class Profile(commands.Cog):
     def __init__(
@@ -109,6 +116,30 @@ class Profile(commands.Cog):
             COOK_COOLDOWN_SECONDS,
         )
 
+        daily_cd = db.check_cooldown(
+            user_id,
+            "last_daily",
+            DAILY_COOLDOWN_SECONDS,
+        )
+
+        weekly_cd = db.check_cooldown(
+            user_id,
+            "last_weekly",
+            WEEKLY_COOLDOWN_SECONDS,
+        )
+
+        monthly_cd = db.check_cooldown(
+            user_id,
+            "last_monthly",
+            MONTHLY_COOLDOWN_SECONDS,
+        )
+
+        yearly_cd = db.check_cooldown(
+            user_id,
+            "last_yearly",
+            YEARLY_COOLDOWN_SECONDS,
+        )
+
         inventory = db.get_all_inventory(
             user_id
         )
@@ -172,10 +203,16 @@ class Profile(commands.Cog):
             value=(
                 f"Work: "
                 f"`{'Ready' if trabaho_cd == 0 else db.format_duration(trabaho_cd)}`\n"
-                f"Sideline: "
-                f"`{'Ready' if sideline_cd == 0 else db.format_duration(sideline_cd)}`\n"
                 f"Allowance: "
-                f"`{'Ready' if baon_cd == 0 else db.format_duration(baon_cd)}`"
+                f"`{'Ready' if baon_cd == 0 else db.format_duration(baon_cd)}`\n"
+                f"Daily: "
+                f"`{'Ready' if daily_cd == 0 else db.format_duration(daily_cd)}`\n"
+                f"Weekly: "
+                f"`{'Ready' if weekly_cd == 0 else db.format_duration(weekly_cd)}`\n"
+                f"Monthly: "
+                f"`{'Ready' if monthly_cd == 0 else db.format_duration(monthly_cd)}`\n"
+                f"Yearly: "
+                f"`{'Ready' if yearly_cd == 0 else db.format_duration(yearly_cd)}`"
             ),
             inline=True,
         )
@@ -185,6 +222,8 @@ class Profile(commands.Cog):
             value=(
                 f"Karaoke: "
                 f"`{'Ready' if karaoke_cd == 0 else db.format_duration(karaoke_cd)}`\n"
+                f"Sideline: "
+                f"`{'Ready' if sideline_cd == 0 else db.format_duration(sideline_cd)}`\n"
                 f"Fish: "
                 f"`{'Ready' if fish_cd == 0 else db.format_duration(fish_cd)}`\n"
                 f"Mine: "
