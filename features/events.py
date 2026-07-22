@@ -288,8 +288,9 @@ class Events(commands.Cog):
         self,
         guild: discord.Guild,
         channel: discord.abc.Messageable,
-    ):
-        event_key = choose_event_key()
+        event_key: str | None = None,
+    ) -> str | None:
+        event_key = event_key or choose_event_key()
         event_type = EVENT_TYPES[event_key]
 
         reward = random.randint(
@@ -302,7 +303,7 @@ class Events(commands.Cog):
         try:
             message = await channel.send(embed=embed)
         except discord.HTTPException:
-            return
+            return None
 
         now = time.time()
 
@@ -320,6 +321,8 @@ class Events(commands.Cog):
                 event_type["claim_seconds"],
             )
         )
+
+        return event_key
 
     async def expire_event(self, guild_id: int, delay: float):
         await asyncio.sleep(delay)
@@ -368,6 +371,97 @@ class Events(commands.Cog):
 
     @setchannel.error
     async def setchannel_error(
+        self,
+        interaction: discord.Interaction,
+        error: app_commands.AppCommandError,
+    ):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message(
+                "❌ You need the `Manage Server` permission to do that.",
+                ephemeral=True,
+            )
+            return
+
+        raise error
+
+    # ==========================
+    # /event trigger
+    # ==========================
+
+    @event_group.command(
+        name="trigger",
+        description="Manually start an event now.",
+    )
+    @app_commands.describe(
+        event_type="Choose a specific event, or leave blank for a random one",
+    )
+    @app_commands.choices(
+        event_type=[
+            app_commands.Choice(
+                name=event_type["name"],
+                value=key,
+            )
+            for key, event_type in EVENT_TYPES.items()
+        ]
+    )
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def trigger(
+        self,
+        interaction: discord.Interaction,
+        event_type: app_commands.Choice[str] | None = None,
+    ):
+        guild = interaction.guild
+        channel_id = get_event_channel(guild.id)
+
+        if channel_id is None:
+            await interaction.response.send_message(
+                "❌ No event channel is set. Use `/event setchannel` first.",
+                ephemeral=True,
+            )
+            return
+
+        if guild.id in self.active_events:
+            await interaction.response.send_message(
+                "❌ There's already an active event — wait for it to be claimed or expire.",
+                ephemeral=True,
+            )
+            return
+
+        channel = guild.get_channel(channel_id)
+
+        if channel is None:
+            await interaction.response.send_message(
+                "❌ The configured event channel no longer exists. "
+                "Use `/event setchannel` to set a new one.",
+                ephemeral=True,
+            )
+            return
+
+        requested_key = event_type.value if event_type else None
+
+        spawned_key = await self.spawn_event(
+            guild,
+            channel,
+            event_key=requested_key,
+        )
+
+        if spawned_key is None:
+            await interaction.response.send_message(
+                "❌ Couldn't send the event to that channel — check my permissions there.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(
+            (
+                f"✅ Started a **{EVENT_TYPES[spawned_key]['name']}** "
+                f"event in {channel.mention}!"
+            ),
+            ephemeral=True,
+        )
+
+    @trigger.error
+    async def trigger_error(
         self,
         interaction: discord.Interaction,
         error: app_commands.AppCommandError,
