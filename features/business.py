@@ -41,18 +41,18 @@ REPAIR_COST_MIN_RATE = 0.03  # % of purchase price
 REPAIR_COST_MAX_RATE = 0.09
 
 MAINTENANCE_ISSUES = [
-    "Nasira ang gripo/tubo",
-    "Nag-aberya ang generator",
-    "Kailangan ng bagong compressor",
-    "Nasunugan ang de-koryenteng wiring",
-    "Nabasag ang mga gamit/kagamitan",
-    "May leak sa bubong",
-    "Nasira ang aircon/refrigeration unit",
-    "Kailangan ng pahinga ang mga makina",
-    "Baha sa loob ng tindahan",
-    "Kailangan ng bagong parts para sa makina",
-    "Nagalit ang barangay dahil sa permit — kailangan i-renew",
-    "Nasira ang cash register / POS system",
+    "The faucet or pipes broke.",
+    "The generator malfunctioned.",
+    "A new compressor is needed.",
+    "The electrical wiring was damaged.",
+    "Some equipment was broken.",
+    "The roof started leaking.",
+    "The air conditioner or refrigeration unit broke down.",
+    "The machines need maintenance.",
+    "The business was flooded.",
+    "New machine parts are needed.",
+    "The permit expired and needs to be renewed.",
+    "The cash register / POS system broke.",
 ]
 
 # Realistic-ish PHP capital + net daily income for Filipino small and
@@ -359,7 +359,7 @@ class Business(commands.Cog):
             conn.close()
 
             await interaction.response.send_message(
-                f"May-ari ka na ng {business_label(key)}."
+                f"You already own {business_label(key)}."
             )
             return
 
@@ -369,7 +369,7 @@ class Business(commands.Cog):
             conn.close()
 
             await interaction.response.send_message(
-                f"Kulang ang pera mo. Kailangan mo ng "
+                f"You don't have enough money. You need "
                 f"**{db.format_peso(info['price'])}**."
             )
             return
@@ -406,7 +406,7 @@ class Business(commands.Cog):
         embed = discord.Embed(
             title="Business Bought",
             description=(
-                f"Nabili mo ang {business_label(key)} para sa "
+                f"You purchased {business_label(key)} for "
                 f"**{db.format_peso(info['price'])}**."
             ),
             color=WHITE,
@@ -449,7 +449,7 @@ class Business(commands.Cog):
             conn.close()
 
             await interaction.response.send_message(
-                f"Wala kang {business_label(key)}."
+                f"You don't own {business_label(key)}."
             )
             return
 
@@ -475,7 +475,7 @@ class Business(commands.Cog):
         embed = discord.Embed(
             title="Business Sold",
             description=(
-                f"Naibenta mo ang {business_label(key)} "
+                f"You sold {business_label(key)} "
                 f"(Level {owned['level']}) para sa "
                 f"**{db.format_peso(refund)}**."
             ),
@@ -484,7 +484,7 @@ class Business(commands.Cog):
 
         if owned["broken"]:
             embed.description += (
-                f"\n(Nabawasan ang halaga dahil may hindi pa "
+                f"\n(The value was reduced because of unpaid repairs worth "
                 f"nababayarang repair na **{db.format_peso(owned['repair_cost'])}**.)"
             )
 
@@ -521,7 +521,7 @@ class Business(commands.Cog):
 
         if not owned:
             await interaction.response.send_message(
-                "Wala ka pang negosyo. Try `/business list`."
+                "You don't own any businesses yet. Try `/business list`."
             )
             return
 
@@ -537,7 +537,7 @@ class Business(commands.Cog):
 
             if row["broken"]:
                 status = (
-                    f"🛠️ needs repair — "
+                    f"🛠️ Needs repair — "
                     f"**{db.format_peso(row['repair_cost'])}**"
                 )
             else:
@@ -545,9 +545,9 @@ class Business(commands.Cog):
                 ready = elapsed >= COLLECT_INTERVAL_SECONDS
 
                 status = (
-                    "ready to collect"
+                    "Ready to collect"
                     if ready
-                    else f"ready <t:{row['last_collected'] + COLLECT_INTERVAL_SECONDS}:R>"
+                    else f"Ready <t:{row['last_collected'] + COLLECT_INTERVAL_SECONDS}:R>"
                 )
 
             total_lifetime += row["lifetime_earnings"]
@@ -602,7 +602,7 @@ class Business(commands.Cog):
                 conn.close()
 
                 await interaction.response.send_message(
-                    f"Wala kang {business_label(business.value)}."
+                    "You don't own {business_label(business.value)}."
                 )
                 return
         else:
@@ -615,7 +615,7 @@ class Business(commands.Cog):
                 conn.close()
 
                 await interaction.response.send_message(
-                    "Wala ka pang negosyo."
+                    "You don't own any businesses yet."
                 )
                 return
 
@@ -632,7 +632,7 @@ class Business(commands.Cog):
             if row["broken"]:
                 lines.append(
                     f"{business_label(row['business_key'])} — 🛠️ "
-                    f"needs repair (**{db.format_peso(row['repair_cost'])}**) "
+                    f"Needs repair (**{db.format_peso(row['repair_cost'])}**) "
                     f"before it can earn again"
                 )
                 continue
@@ -643,7 +643,7 @@ class Business(commands.Cog):
                 remaining = COLLECT_INTERVAL_SECONDS - elapsed
                 lines.append(
                     f"{business_label(row['business_key'])} — "
-                    f"hintay pa **{db.format_duration(remaining)}**"
+                    f"Wait **{db.format_duration(remaining)}**"
                 )
                 continue
 
@@ -674,8 +674,8 @@ class Business(commands.Cog):
                 lines.append(
                     f"{business_label(row['business_key'])} — "
                     f"**{db.format_peso(income)}**\n"
-                    f"⚠️ {reason}! Kailangan ng **{db.format_peso(repair_cost)}** "
-                    f"na repair — `/business repair` para ayusin."
+                    f"⚠️ {reason}! Repairs costing **{db.format_peso(repair_cost)}** "
+                    f"are needed — use `/business repair`."
                 )
 
                 newly_broken.append(row["business_key"])
@@ -734,9 +734,9 @@ class Business(commands.Cog):
         business: app_commands.Choice[str] = None,
     ):
         user_id = str(interaction.user.id)
-
+    
         conn = get_conn()
-
+    
         if business is None:
             broken_rows = conn.execute(
                 """
@@ -745,37 +745,36 @@ class Business(commands.Cog):
                 """,
                 (user_id,),
             ).fetchall()
-
+    
             conn.close()
-
+    
             if not broken_rows:
                 await interaction.response.send_message(
-                    "Ayos naman lahat ng negosyo mo — walang "
-                    "kailangang ayusin. ✅"
+                    "All of your businesses are running normally. ✅"
                 )
                 return
-
+    
             lines = [
                 f"{business_label(r['business_key'])} — "
                 f"**{db.format_peso(r['repair_cost'])}** ({r['repair_reason']})"
                 for r in broken_rows
             ]
-
+    
             embed = discord.Embed(
                 title="🛠️ Businesses Needing Repair",
                 description="\n".join(lines),
                 color=WHITE,
             )
-
+    
             embed.set_footer(
-                text="/business repair <business> para magbayad."
+                text="Use /business repair <business> to repair it."
             )
-
+    
             await interaction.response.send_message(embed=embed)
             return
-
+    
         key = business.value
-
+    
         owned = conn.execute(
             """
             SELECT * FROM owned_businesses
@@ -783,38 +782,40 @@ class Business(commands.Cog):
             """,
             (user_id, key),
         ).fetchone()
-
+    
         if owned is None:
             conn.close()
-
+    
             await interaction.response.send_message(
-                f"Wala kang {business_label(key)}."
+                f"You don't own {business_label(key)}."
             )
             return
-
+    
         if not owned["broken"]:
             conn.close()
-
+    
             await interaction.response.send_message(
-                f"Maayos naman ang {business_label(key)}. "
-                f"Wala itong kailangang ayusin."
+                f"{business_label(key)} doesn't need repairs."
             )
             return
-
+    
         user = db.get_user(user_id)
-
+    
         if user["balance"] < owned["repair_cost"]:
             conn.close()
-
+    
             await interaction.response.send_message(
-                f"Kulang ang pera mo. Kailangan mo ng "
-                f"**{db.format_peso(owned['repair_cost'])}** para maayos "
-                f"ang {business_label(key)} ({owned['repair_reason']})."
+                f"You don't have enough money. You need "
+                f"**{db.format_peso(owned['repair_cost'])}** to repair "
+                f"{business_label(key)} ({owned['repair_reason']})."
             )
             return
-
-        new_balance = db.add_balance(user_id, -owned["repair_cost"])
-
+    
+        new_balance = db.add_balance(
+            user_id,
+            -owned["repair_cost"],
+        )
+    
         conn.execute(
             """
             UPDATE owned_businesses
@@ -826,25 +827,27 @@ class Business(commands.Cog):
             """,
             (owned["id"],),
         )
-
+    
         conn.commit()
         conn.close()
-
+    
         embed = discord.Embed(
             title="Business Repaired",
             description=(
-                f"Naayos mo na ang {business_label(key)} para sa "
+                f"You repaired {business_label(key)} for "
                 f"**{db.format_peso(owned['repair_cost'])}**.\n"
-                f"Puwede ka nang mag-collect ulit dito."
+                f"You can collect income from it again."
             ),
             color=WHITE,
         )
-
+    
         embed.set_footer(
             text=f"Balance: {db.format_peso(new_balance)}"
         )
-
-        await interaction.response.send_message(embed=embed)
+    
+        await interaction.response.send_message(
+            embed=embed
+        )
 
     # ------------------------------------------------------- /business upgrade
 
@@ -862,9 +865,9 @@ class Business(commands.Cog):
         user_id = str(interaction.user.id)
         key = business.value
         info = BUSINESSES[key]
-
+    
         conn = get_conn()
-
+    
         owned = conn.execute(
             """
             SELECT * FROM owned_businesses
@@ -872,78 +875,79 @@ class Business(commands.Cog):
             """,
             (user_id, key),
         ).fetchone()
-
+    
         if owned is None:
             conn.close()
-
+    
             await interaction.response.send_message(
-                f"Wala kang {business_label(key)}."
+                f"You do not own {business_label(key)}."
             )
             return
-
+    
         if owned["broken"]:
             conn.close()
-
+    
             await interaction.response.send_message(
-                f"Ayusin mo muna ang {business_label(key)} "
-                f"(`/business repair`) bago mag-upgrade."
+                f"You must repair {business_label(key)} "
+                f"first using `/business repair` before upgrading it."
             )
             return
-
+    
         if owned["level"] >= UPGRADE_MAX_LEVEL:
             conn.close()
-
+    
             await interaction.response.send_message(
-                f"Max level na ang {business_label(key)} "
-                f"(Lv. {UPGRADE_MAX_LEVEL})."
+                f"{business_label(key)} has already reached "
+                f"the maximum level (Lv. {UPGRADE_MAX_LEVEL})."
             )
             return
-
+    
         cost = upgrade_cost(info["price"], owned["level"])
         user = db.get_user(user_id)
-
+    
         if user["balance"] < cost:
             conn.close()
-
+    
             await interaction.response.send_message(
-                f"Kulang ang pera mo. Kailangan mo ng "
-                f"**{db.format_peso(cost)}** para mag-upgrade."
+                f"You do not have enough money.\n"
+                f"You need **{db.format_peso(cost)}** to upgrade "
+                f"{business_label(key)}."
             )
             return
-
+    
         new_balance = db.add_balance(user_id, -cost)
         new_level = owned["level"] + 1
-
+    
         conn.execute(
             "UPDATE owned_businesses SET level = ? WHERE id = ?",
             (new_level, owned["id"]),
         )
-
+    
         conn.commit()
         conn.close()
-
+    
         new_income = income_for_level(info["income"], new_level)
-
+    
         embed = discord.Embed(
             title="Business Upgraded",
             description=(
-                f"Na-upgrade ang {business_label(key)} sa "
-                f"**Level {new_level}**.\n"
-                f"Bagong income: **{db.format_peso(new_income)}** "
-                f"per day."
+                f"{business_label(key)} has been upgraded to "
+                f"**Level {new_level}**.\n\n"
+                f"New daily income: "
+                f"**{db.format_peso(new_income)}**."
             ),
             color=WHITE,
         )
-
+    
         embed.set_footer(
             text=f"Balance: {db.format_peso(new_balance)}"
         )
-
+    
         await interaction.response.send_message(embed=embed)
 
     # ---------------------------------------------------------- /business stats
 
-    @business_group.command(
+        @business_group.command(
         name="stats",
         description="Show lifetime earnings, level, and upgrades for a business.",
     )
@@ -957,9 +961,9 @@ class Business(commands.Cog):
         user_id = str(interaction.user.id)
         key = business.value
         info = BUSINESSES[key]
-
+    
         conn = get_conn()
-
+    
         owned = conn.execute(
             """
             SELECT * FROM owned_businesses
@@ -967,45 +971,52 @@ class Business(commands.Cog):
             """,
             (user_id, key),
         ).fetchone()
-
+    
         conn.close()
-
+    
         if owned is None:
             await interaction.response.send_message(
-                f"Wala kang {business_label(key)}."
+                f"You do not own {business_label(key)}."
             )
             return
-
-        current_income = income_for_level(info["income"], owned["level"])
-
+    
+        current_income = income_for_level(
+            info["income"],
+            owned["level"],
+        )
+    
         next_upgrade = (
-            "Max level na."
+            "Maximum level reached"
             if owned["level"] >= UPGRADE_MAX_LEVEL
             else db.format_peso(
-                upgrade_cost(info["price"], owned["level"])
+                upgrade_cost(
+                    info["price"],
+                    owned["level"],
+                )
             )
         )
-
+    
         description = (
-            f"Level: **{owned['level']}** / {UPGRADE_MAX_LEVEL}\n"
-            f"Income per day: **{db.format_peso(current_income)}**\n"
+            f"Level: **{owned['level']} / {UPGRADE_MAX_LEVEL}**\n"
+            f"Daily income: **{db.format_peso(current_income)}**\n"
             f"Lifetime earnings: **{db.format_peso(owned['lifetime_earnings'])}**\n"
             f"Next upgrade cost: **{next_upgrade}**\n"
-            f"Purchased: <t:{owned['purchased_at']}:D>"
+            f"Purchased on: <t:{owned['purchased_at']}:D>"
         )
-
+    
         if owned["broken"]:
             description += (
-                f"\n\n🛠️ **Needs repair**: {owned['repair_reason']}\n"
+                f"\n\n🛠️ **Needs repair**\n"
+                f"Issue: {owned['repair_reason']}\n"
                 f"Repair cost: **{db.format_peso(owned['repair_cost'])}**"
             )
-
+    
         embed = discord.Embed(
             title=f"{business_label(key)} Stats",
             description=description,
             color=WHITE,
         )
-
+    
         await interaction.response.send_message(embed=embed)
 
     # ----------------------------------------------------- /business leaderboard
@@ -1056,7 +1067,7 @@ class Business(commands.Cog):
 
     @business_group.command(
         name="raid",
-        description="Attempt to steal from another player's business.",
+        description="Attempt to steal money from another player's business.",
     )
     @app_commands.describe(target="Who to raid")
     async def business_raid(
@@ -1066,49 +1077,49 @@ class Business(commands.Cog):
     ):
         attacker_id = str(interaction.user.id)
         target_id = str(target.id)
-
+    
         if attacker_id == target_id:
             await interaction.response.send_message(
-                "Hindi mo puwedeng raidin ang sarili mong negosyo."
+                "You cannot raid your own business."
             )
             return
-
+    
         if target.bot:
             await interaction.response.send_message(
-                "Hindi puwedeng raidin ang bots."
+                "You cannot raid bots."
             )
             return
-
+    
         conn = get_conn()
-
+    
         target_owns_business = conn.execute(
             "SELECT id FROM owned_businesses WHERE user_id = ? LIMIT 1",
             (target_id,),
         ).fetchone()
-
+    
         conn.close()
-
+    
         if target_owns_business is None:
             await interaction.response.send_message(
-                f"Wala pang negosyo si {target.display_name}."
+                f"{target.display_name} does not own any businesses."
             )
             return
-
+    
         attacker_status = get_status(attacker_id)
         now = int(time.time())
         elapsed = now - attacker_status["last_raid"]
-
+    
         if elapsed < RAID_COOLDOWN_SECONDS:
             remaining = RAID_COOLDOWN_SECONDS - elapsed
-
+    
             await interaction.response.send_message(
-                f"Nakaka-pagod mag-raid. Try again in "
-                f"**{db.format_duration(remaining)}**."
+                f"You are still recovering from your last raid.\n"
+                f"Try again in **{db.format_duration(remaining)}**."
             )
             return
-
+    
         conn = get_conn()
-
+    
         conn.execute(
             """
             UPDATE business_status
@@ -1117,24 +1128,24 @@ class Business(commands.Cog):
             """,
             (now, attacker_id),
         )
-
+    
         conn.commit()
         conn.close()
-
+    
         target_status = get_status(target_id)
-
+    
         if target_status["protected_until"] > now:
             await interaction.response.send_message(
-                f"May protection pa si {target.mention}. "
-                f"Bigo ang raid mo."
+                f"{target.mention} is currently protected.\n"
+                f"Your raid has failed."
             )
             return
-
+    
         success = random.random() < RAID_SUCCESS_CHANCE
-
+    
         if success:
             target_user = db.get_user(target_id)
-
+    
             stolen = min(
                 round(
                     target_user["balance"]
@@ -1145,55 +1156,57 @@ class Business(commands.Cog):
                 ),
                 RAID_STEAL_CAP,
             )
-
+    
             if stolen <= 0:
                 embed = discord.Embed(
                     title="Raid Attempt",
                     description=(
-                        f"Wala palang pera sa kaha ni "
-                        f"{target.mention}."
+                        f"You broke into {target.mention}'s business, "
+                        f"but there was no money to steal."
                     ),
                     color=WHITE,
                 )
             else:
                 db.add_balance(target_id, -stolen)
                 new_balance = db.add_balance(attacker_id, stolen)
-
+    
                 embed = discord.Embed(
-                    title="Raid Success",
+                    title="Raid Successful",
                     description=(
-                        f"Na-raid mo ang negosyo ni "
-                        f"{target.mention} at nakakuha ka ng "
-                        f"**{db.format_peso(stolen)}**."
+                        f"You raided {target.mention}'s business and "
+                        f"stole **{db.format_peso(stolen)}**."
                     ),
                     color=WHITE,
                 )
-
+    
                 embed.set_footer(
                     text=f"Balance: {db.format_peso(new_balance)}"
                 )
+    
         else:
             penalty = random.randint(
                 RAID_FAIL_PENALTY_MIN,
                 RAID_FAIL_PENALTY_MAX,
             )
-
-            new_balance = db.add_balance(attacker_id, -penalty)
-
+    
+            new_balance = db.add_balance(
+                attacker_id,
+                -penalty,
+            )
+    
             embed = discord.Embed(
                 title="Raid Failed",
                 description=(
-                    f"Nahuli ka ng guwardiya ni "
-                    f"{target.mention}.\n\n"
-                    f"Multa: **{db.format_peso(penalty)}**."
+                    f"You were caught by {target.mention}'s security guards.\n\n"
+                    f"Fine: **{db.format_peso(penalty)}**."
                 ),
                 color=WHITE,
             )
-
+    
             embed.set_footer(
                 text=f"Balance: {db.format_peso(new_balance)}"
             )
-
+    
         await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------- /business defend
@@ -1207,31 +1220,32 @@ class Business(commands.Cog):
         interaction: discord.Interaction,
     ):
         user_id = str(interaction.user.id)
-
+    
         status = get_status(user_id)
         now = int(time.time())
-
+    
         if status["protected_until"] > now:
             await interaction.response.send_message(
-                f"Protektado ka pa hanggang "
+                f"Your businesses are already protected until "
                 f"<t:{status['protected_until']}:R>."
             )
             return
-
+    
         user = db.get_user(user_id)
-
+    
         if user["balance"] < DEFEND_COST:
             await interaction.response.send_message(
-                f"Kulang ang pera mo. Kailangan mo ng "
-                f"**{db.format_peso(DEFEND_COST)}** para mag-tanod."
+                f"You do not have enough money.\n"
+                f"You need **{db.format_peso(DEFEND_COST)}** "
+                f"to hire security."
             )
             return
-
+    
         new_balance = db.add_balance(user_id, -DEFEND_COST)
         protected_until = now + DEFEND_DURATION_SECONDS
-
+    
         conn = get_conn()
-
+    
         conn.execute(
             """
             UPDATE business_status
@@ -1240,23 +1254,23 @@ class Business(commands.Cog):
             """,
             (protected_until, user_id),
         )
-
+    
         conn.commit()
         conn.close()
-
+    
         embed = discord.Embed(
             title="Security Hired",
             description=(
-                f"Protektado ang mga negosyo mo hanggang "
+                f"Your businesses are protected from raids until "
                 f"<t:{protected_until}:R>."
             ),
             color=WHITE,
         )
-
+    
         embed.set_footer(
             text=f"Balance: {db.format_peso(new_balance)}"
         )
-
+    
         await interaction.response.send_message(embed=embed)
 
     # ----------------------------------------------------- /business bankrupt
@@ -1274,9 +1288,9 @@ class Business(commands.Cog):
     ):
         user_id = str(interaction.user.id)
         key = business.value
-
+    
         conn = get_conn()
-
+    
         owned = conn.execute(
             """
             SELECT * FROM owned_businesses
@@ -1284,32 +1298,32 @@ class Business(commands.Cog):
             """,
             (user_id, key),
         ).fetchone()
-
+    
         if owned is None:
             conn.close()
-
+    
             await interaction.response.send_message(
-                f"Wala kang {business_label(key)}."
+                f"You do not own {business_label(key)}."
             )
             return
-
+    
         conn.execute(
             "DELETE FROM owned_businesses WHERE id = ?",
             (owned["id"],),
         )
-
+    
         conn.commit()
         conn.close()
-
+    
         embed = discord.Embed(
             title="Business Closed",
             description=(
-                f"Isinara mo ang {business_label(key)}. "
-                f"Walang refund."
+                f"You permanently closed {business_label(key)}.\n\n"
+                f"You will not receive any refund."
             ),
             color=WHITE,
         )
-
+    
         await interaction.response.send_message(embed=embed)
 
 
