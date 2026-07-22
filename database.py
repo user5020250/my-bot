@@ -18,13 +18,33 @@ DB_PATH = os.path.join(
 
 
 def get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(
-        DB_PATH
-    )
+    conn = sqlite3.connect(DB_PATH)
 
     conn.row_factory = sqlite3.Row
 
     return conn
+
+
+def add_column_if_missing(
+    conn: sqlite3.Connection,
+    table: str,
+    column: str,
+    definition: str,
+):
+    columns = {
+        row["name"]
+        for row in conn.execute(
+            f"PRAGMA table_info({table})"
+        ).fetchall()
+    }
+
+    if column not in columns:
+        conn.execute(
+            f"""
+            ALTER TABLE {table}
+            ADD COLUMN {column} {definition}
+            """
+        )
 
 
 def init_db() -> None:
@@ -47,7 +67,13 @@ def init_db() -> None:
             last_daily INTEGER NOT NULL DEFAULT 0,
             last_weekly INTEGER NOT NULL DEFAULT 0,
             last_monthly INTEGER NOT NULL DEFAULT 0,
-            last_yearly INTEGER NOT NULL DEFAULT 0
+            last_yearly INTEGER NOT NULL DEFAULT 0,
+
+            last_fish INTEGER NOT NULL DEFAULT 0,
+            last_mine INTEGER NOT NULL DEFAULT 0,
+            last_farm INTEGER NOT NULL DEFAULT 0,
+            last_hunt INTEGER NOT NULL DEFAULT 0,
+            last_cook INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS inventory (
@@ -97,10 +123,17 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             lender TEXT NOT NULL,
             borrower TEXT NOT NULL,
+
             principal INTEGER NOT NULL,
             remaining INTEGER NOT NULL,
+
             due_date INTEGER NOT NULL,
+
             status TEXT NOT NULL DEFAULT 'active',
+
+            overdue_count INTEGER NOT NULL DEFAULT 0,
+            last_escalated_at INTEGER,
+
             created_at INTEGER NOT NULL
         );
 
@@ -125,86 +158,88 @@ def init_db() -> None:
             user_id TEXT PRIMARY KEY,
 
             last_raid INTEGER NOT NULL DEFAULT 0,
-            protected_until INTEGER NOT NULL DEFAULT 0
+            protected_until INTEGER NOT NULL DEFAULT 0,
+
+            gloves_until INTEGER NOT NULL DEFAULT 0,
+            mask_until INTEGER NOT NULL DEFAULT 0,
+
+            alarm_system INTEGER NOT NULL DEFAULT 0,
+            insurance INTEGER NOT NULL DEFAULT 0
         );
         """
     )
 
-    user_columns = {
-        row["name"]
-        for row in conn.execute(
-            "PRAGMA table_info(users)"
-        ).fetchall()
+    user_migrations = {
+        "last_sideline": "INTEGER NOT NULL DEFAULT 0",
+        "last_daily": "INTEGER NOT NULL DEFAULT 0",
+        "last_weekly": "INTEGER NOT NULL DEFAULT 0",
+        "last_monthly": "INTEGER NOT NULL DEFAULT 0",
+        "last_yearly": "INTEGER NOT NULL DEFAULT 0",
+        "last_fish": "INTEGER NOT NULL DEFAULT 0",
+        "last_mine": "INTEGER NOT NULL DEFAULT 0",
+        "last_farm": "INTEGER NOT NULL DEFAULT 0",
+        "last_hunt": "INTEGER NOT NULL DEFAULT 0",
+        "last_cook": "INTEGER NOT NULL DEFAULT 0",
     }
 
-    inventory_columns = {
-        row["name"]
-        for row in conn.execute(
-            "PRAGMA table_info(inventory)"
-        ).fetchall()
+    for column, definition in user_migrations.items():
+        add_column_if_missing(
+            conn,
+            "users",
+            column,
+            definition,
+        )
+
+    inventory_migrations = {
+        "avg_buy_price": "INTEGER NOT NULL DEFAULT 0",
     }
 
-    lottery_columns = {
-        row["name"]
-        for row in conn.execute(
-            "PRAGMA table_info(lottery)"
-        ).fetchall()
+    for column, definition in inventory_migrations.items():
+        add_column_if_missing(
+            conn,
+            "inventory",
+            column,
+            definition,
+        )
+
+    lottery_migrations = {
+        "ends_at": "INTEGER NOT NULL DEFAULT 0",
     }
 
-    if "last_sideline" not in user_columns:
-        conn.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN last_sideline INTEGER NOT NULL DEFAULT 0
-            """
+    for column, definition in lottery_migrations.items():
+        add_column_if_missing(
+            conn,
+            "lottery",
+            column,
+            definition,
         )
 
-    if "last_daily" not in user_columns:
-        conn.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN last_daily INTEGER NOT NULL DEFAULT 0
-            """
+    loan_migrations = {
+        "overdue_count": "INTEGER NOT NULL DEFAULT 0",
+        "last_escalated_at": "INTEGER",
+    }
+
+    for column, definition in loan_migrations.items():
+        add_column_if_missing(
+            conn,
+            "loans",
+            column,
+            definition,
         )
 
-    if "last_weekly" not in user_columns:
-        conn.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN last_weekly INTEGER NOT NULL DEFAULT 0
-            """
-        )
+    business_status_migrations = {
+        "gloves_until": "INTEGER NOT NULL DEFAULT 0",
+        "mask_until": "INTEGER NOT NULL DEFAULT 0",
+        "alarm_system": "INTEGER NOT NULL DEFAULT 0",
+        "insurance": "INTEGER NOT NULL DEFAULT 0",
+    }
 
-    if "last_monthly" not in user_columns:
-        conn.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN last_monthly INTEGER NOT NULL DEFAULT 0
-            """
-        )
-
-    if "last_yearly" not in user_columns:
-        conn.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN last_yearly INTEGER NOT NULL DEFAULT 0
-            """
-        )
-
-    if "avg_buy_price" not in inventory_columns:
-        conn.execute(
-            """
-            ALTER TABLE inventory
-            ADD COLUMN avg_buy_price INTEGER NOT NULL DEFAULT 0
-            """
-        )
-
-    if "ends_at" not in lottery_columns:
-        conn.execute(
-            """
-            ALTER TABLE lottery
-            ADD COLUMN ends_at INTEGER NOT NULL DEFAULT 0
-            """
+    for column, definition in business_status_migrations.items():
+        add_column_if_missing(
+            conn,
+            "business_status",
+            column,
+            definition,
         )
 
     conn.execute(
