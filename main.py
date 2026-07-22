@@ -35,6 +35,7 @@ COGS = [
     "features.lottery",
     "features.karaoke",
     "features.trade",
+    "features.events",
 ]
 
 
