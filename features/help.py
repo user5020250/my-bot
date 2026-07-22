@@ -294,9 +294,15 @@ CATEGORIES = [
     ),
 ]
 
-PAGES = []
+CATEGORY_NAMES = [category_name for category_name, _ in CATEGORIES]
 
-for category_name, category_commands in CATEGORIES:
+# Maps category index -> list of pages (each page is a list of
+# (name, description) command tuples). Categories with more than
+# COMMANDS_PER_PAGE commands get split across several pages, which
+# the prev/next buttons page through within the selected category.
+CATEGORY_PAGES = {}
+
+for index, (category_name, category_commands) in enumerate(CATEGORIES):
     chunks = [
         category_commands[i:i + COMMANDS_PER_PAGE]
         for i in range(
@@ -306,12 +312,106 @@ for category_name, category_commands in CATEGORIES:
         )
     ]
 
-    for chunk in chunks:
-        PAGES.append(
-            {
-                "category": category_name,
-                "commands": chunk,
-            }
+    CATEGORY_PAGES[index] = chunks or [[]]
+
+
+class HelpCategorySelect(discord.ui.Select):
+    def __init__(self, view: "HelpView"):
+        options = [
+            discord.SelectOption(
+                label=name,
+                value=str(i),
+                default=(i == view.category_index),
+            )
+            for i, name in enumerate(CATEGORY_NAMES)
+        ]
+
+        super().__init__(
+            placeholder="Choose a category...",
+            options=options,
+            min_values=1,
+            max_values=1,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: HelpView = self.view
+
+        view.category_index = int(self.values[0])
+        view.page_index = 0
+
+        for option in self.options:
+            option.default = (option.value == self.values[0])
+
+        view.update_buttons()
+
+        await interaction.response.edit_message(
+            embed=view.build_embed(),
+            view=view,
+        )
+
+
+class HelpPrevButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="◀",
+            style=discord.ButtonStyle.secondary,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: HelpView = self.view
+        pages = CATEGORY_PAGES[view.category_index]
+
+        view.page_index = (
+            view.page_index - 1
+        ) % len(pages)
+
+        await interaction.response.edit_message(
+            embed=view.build_embed(),
+            view=view,
+        )
+
+
+class HelpCloseButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="✖",
+            style=discord.ButtonStyle.danger,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: HelpView = self.view
+
+        view.stop()
+
+        await interaction.response.edit_message(
+            content="👋 Help menu closed.",
+            embed=None,
+            view=None,
+        )
+
+
+class HelpNextButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="▶",
+            style=discord.ButtonStyle.secondary,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: HelpView = self.view
+        pages = CATEGORY_PAGES[view.category_index]
+
+        view.page_index = (
+            view.page_index + 1
+        ) % len(pages)
+
+        await interaction.response.edit_message(
+            embed=view.build_embed(),
+            view=view,
         )
 
 
@@ -320,27 +420,54 @@ class HelpView(discord.ui.View):
         super().__init__(timeout=120)
 
         self.author_id = author_id
-        self.page = 0
+        self.category_index = 0
+        self.page_index = 0
         self.message = None
 
+        self.add_item(HelpCategorySelect(self))
+
+        self.prev_button = HelpPrevButton()
+        self.close_button = HelpCloseButton()
+        self.next_button = HelpNextButton()
+
+        self.add_item(self.prev_button)
+        self.add_item(self.close_button)
+        self.add_item(self.next_button)
+
+        self.update_buttons()
+
+    def update_buttons(self):
+        pages = CATEGORY_PAGES[self.category_index]
+        multi_page = len(pages) > 1
+
+        self.prev_button.disabled = not multi_page
+        self.next_button.disabled = not multi_page
+
     def build_embed(self):
-        data = PAGES[self.page]
+        category_name = CATEGORY_NAMES[self.category_index]
+        pages = CATEGORY_PAGES[self.category_index]
+        commands_on_page = pages[self.page_index]
 
         embed = discord.Embed(
-            title=f"📖 Commands — {data['category']}",
+            title=f"📖 Commands — {category_name}",
             color=WHITE,
         )
 
-        for name, desc in data["commands"]:
+        for name, desc in commands_on_page:
             embed.add_field(
                 name=name,
                 value=desc,
                 inline=False,
             )
 
-        embed.set_footer(
-            text=f"Page {self.page + 1}/{len(PAGES)}"
-        )
+        if len(pages) > 1:
+            embed.set_footer(
+                text=f"Page {self.page_index + 1}/{len(pages)}"
+            )
+        else:
+            embed.set_footer(
+                text="Use the dropdown to browse categories."
+            )
 
         return embed
 
@@ -368,59 +495,6 @@ class HelpView(discord.ui.View):
                 )
             except discord.HTTPException:
                 pass
-
-    @discord.ui.button(
-        label="◀",
-        style=discord.ButtonStyle.secondary,
-    )
-    async def previous(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ):
-        self.page = (
-            self.page - 1
-        ) % len(PAGES)
-
-        await interaction.response.edit_message(
-            embed=self.build_embed(),
-            view=self,
-        )
-
-    @discord.ui.button(
-        label="✖",
-        style=discord.ButtonStyle.danger,
-    )
-    async def close(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ):
-        self.stop()
-
-        await interaction.response.edit_message(
-            content="👋 Help menu closed.",
-            embed=None,
-            view=None,
-        )
-
-    @discord.ui.button(
-        label="▶",
-        style=discord.ButtonStyle.secondary,
-    )
-    async def next(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ):
-        self.page = (
-            self.page + 1
-        ) % len(PAGES)
-
-        await interaction.response.edit_message(
-            embed=self.build_embed(),
-            view=self,
-        )
 
 
 class Help(commands.Cog):
