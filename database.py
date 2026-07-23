@@ -50,6 +50,20 @@ def add_column_if_missing(
 def init_db() -> None:
     conn = get_conn()
 
+    # NOTE: the following tables were removed along with their cogs and
+    # are no longer created here:
+    #   - inventory          (was inventory.py)
+    #   - shop_stock         (was shop.py)
+    #   - debts              (was loan.py)
+    #   - loans              (was loan.py)
+    #   - owned_businesses   (was business.py)
+    #   - business_status    (was business.py)
+    #   - lottery            (was lottery.py)
+    #   - lottery_entries    (was lottery.py)
+    #   - lottery_channels   (was lottery.py)
+    # If any leftover tables exist in an old economy.db file, they are
+    # simply ignored (not dropped) — see the DROP TABLE section below if
+    # you want this script to clean them up automatically instead.
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -75,97 +89,6 @@ def init_db() -> None:
             last_hunt INTEGER NOT NULL DEFAULT 0,
             last_cook INTEGER NOT NULL DEFAULT 0
         );
-
-        CREATE TABLE IF NOT EXISTS inventory (
-            user_id TEXT NOT NULL,
-            item TEXT NOT NULL,
-            qty INTEGER NOT NULL DEFAULT 0,
-            avg_buy_price INTEGER NOT NULL DEFAULT 0,
-
-            PRIMARY KEY (
-                user_id,
-                item
-            )
-        );
-
-        CREATE TABLE IF NOT EXISTS shop_stock (
-            item TEXT PRIMARY KEY,
-            stock INTEGER NOT NULL,
-            last_refresh INTEGER NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS lottery (
-            id INTEGER PRIMARY KEY,
-            prize INTEGER NOT NULL,
-            ends_at INTEGER NOT NULL DEFAULT 0,
-            active INTEGER NOT NULL DEFAULT 1
-        );
-
-        CREATE TABLE IF NOT EXISTS lottery_entries (
-            user_id TEXT PRIMARY KEY,
-            tickets INTEGER NOT NULL DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS lottery_channels (
-            guild_id TEXT PRIMARY KEY,
-            channel_id TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS debts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            lender TEXT NOT NULL,
-            borrower TEXT NOT NULL,
-            amount INTEGER NOT NULL,
-            created_at INTEGER NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS loans (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            lender TEXT NOT NULL,
-            borrower TEXT NOT NULL,
-
-            principal INTEGER NOT NULL,
-            remaining INTEGER NOT NULL,
-
-            due_date INTEGER NOT NULL,
-
-            status TEXT NOT NULL DEFAULT 'active',
-
-            overdue_count INTEGER NOT NULL DEFAULT 0,
-            last_escalated_at INTEGER,
-
-            created_at INTEGER NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS owned_businesses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-            user_id TEXT NOT NULL,
-            business_key TEXT NOT NULL,
-
-            level INTEGER NOT NULL DEFAULT 1,
-            last_collected INTEGER NOT NULL,
-            lifetime_earnings INTEGER NOT NULL DEFAULT 0,
-            purchased_at INTEGER NOT NULL,
-
-            UNIQUE (
-                user_id,
-                business_key
-            )
-        );
-
-        CREATE TABLE IF NOT EXISTS business_status (
-            user_id TEXT PRIMARY KEY,
-
-            last_raid INTEGER NOT NULL DEFAULT 0,
-            protected_until INTEGER NOT NULL DEFAULT 0,
-
-            gloves_until INTEGER NOT NULL DEFAULT 0,
-            mask_until INTEGER NOT NULL DEFAULT 0,
-
-            alarm_system INTEGER NOT NULL DEFAULT 0,
-            insurance INTEGER NOT NULL DEFAULT 0
-        );
         """
     )
 
@@ -190,61 +113,20 @@ def init_db() -> None:
             definition,
         )
 
-    inventory_migrations = {
-        "avg_buy_price": "INTEGER NOT NULL DEFAULT 0",
-    }
-
-    for column, definition in inventory_migrations.items():
-        add_column_if_missing(
-            conn,
-            "inventory",
-            column,
-            definition,
-        )
-
-    lottery_migrations = {
-        "ends_at": "INTEGER NOT NULL DEFAULT 0",
-    }
-
-    for column, definition in lottery_migrations.items():
-        add_column_if_missing(
-            conn,
-            "lottery",
-            column,
-            definition,
-        )
-
-    loan_migrations = {
-        "overdue_count": "INTEGER NOT NULL DEFAULT 0",
-        "last_escalated_at": "INTEGER",
-    }
-
-    for column, definition in loan_migrations.items():
-        add_column_if_missing(
-            conn,
-            "loans",
-            column,
-            definition,
-        )
-
-    business_status_migrations = {
-        "gloves_until": "INTEGER NOT NULL DEFAULT 0",
-        "mask_until": "INTEGER NOT NULL DEFAULT 0",
-        "alarm_system": "INTEGER NOT NULL DEFAULT 0",
-        "insurance": "INTEGER NOT NULL DEFAULT 0",
-    }
-
-    for column, definition in business_status_migrations.items():
-        add_column_if_missing(
-            conn,
-            "business_status",
-            column,
-            definition,
-        )
-
-    conn.execute(
+    # Drops tables from old/removed features so they don't linger in
+    # existing economy.db files. Safe to run repeatedly (IF EXISTS).
+    conn.executescript(
         """
-        DROP TABLE IF EXISTS lotteries
+        DROP TABLE IF EXISTS lotteries;
+        DROP TABLE IF EXISTS lottery;
+        DROP TABLE IF EXISTS lottery_entries;
+        DROP TABLE IF EXISTS lottery_channels;
+        DROP TABLE IF EXISTS inventory;
+        DROP TABLE IF EXISTS shop_stock;
+        DROP TABLE IF EXISTS debts;
+        DROP TABLE IF EXISTS loans;
+        DROP TABLE IF EXISTS owned_businesses;
+        DROP TABLE IF EXISTS business_status;
         """
     )
 
