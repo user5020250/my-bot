@@ -3,7 +3,6 @@ from discord import app_commands
 from discord.ext import commands
 
 import db_utils as db
-from database import get_conn
 from features.shop import SHOP_ITEMS
 
 WHITE = discord.Color(0xFFFFFF)
@@ -14,24 +13,14 @@ ITEMS_PER_PAGE = 10
 def get_user_inventory(user_id: str):
     """
     Returns a list of (item_id, qty) for everything the user owns
-    with qty > 0, ordered by item id.
+    with qty > 0, sorted alphabetically by item id.
     """
-    conn = get_conn()
+    rows = db.get_all_inventory(user_id)
 
-    rows = conn.execute(
-        """
-        SELECT item, qty
-        FROM inventory
-        WHERE user_id = ?
-        AND qty > 0
-        ORDER BY item ASC
-        """,
-        (user_id,),
-    ).fetchall()
+    items = [(row["item"], row["qty"]) for row in rows]
+    items.sort(key=lambda pair: pair[0])
 
-    conn.close()
-
-    return [(row["item"], row["qty"]) for row in rows]
+    return items
 
 
 def build_inventory_embed(
