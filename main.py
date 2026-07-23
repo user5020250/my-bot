@@ -27,7 +27,6 @@ COGS = [
     "features.rewards",
     "features.leaderboard",
     "features.steal",
-    "features.lottery",
     "features.karaoke",
     "features.events",
 ]
