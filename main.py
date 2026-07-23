@@ -20,21 +20,15 @@ COGS = [
     "cogs.message",
     "cogs.role",
     "features.economy",   # NEW: /jobs /work /tambay /scatter /allowance
-    "features.loan",    # NEW: /loan
     "features.admin",     # NEW: /give
     "features.help",      # NEW: /help
-    "features.inventory", # NEW: /inventory
     "features.sideline", # NEW: /sideline
     "features.profile", # NEW: /profile
-    "features.business", 
     "features.rewards",
     "features.leaderboard",
     "features.steal",
-    "features.shop",
-    "features.use",
     "features.lottery",
     "features.karaoke",
-    "features.trade",
     "features.events",
 ]
 
