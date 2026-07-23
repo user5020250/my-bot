@@ -183,7 +183,7 @@ class Profile(commands.Cog):
         net_worth = balance + inventory_value + biz_resale - owed_by_you
 
         embed = discord.Embed(
-            title=f"👤 {member.display_name}'s Profile",
+            title=f"{member.display_name}",
             color=WHITE,
         )
 
@@ -191,10 +191,10 @@ class Profile(commands.Cog):
 
         # ---------------- Money ----------------
         embed.add_field(
-            name="💰 Money",
+            name="Money",
             value=(
                 f"Wallet: `{db.format_peso(balance)}`\n"
-                f"Net Worth:\n`{db.format_peso(net_worth)}`"
+                f"Net Worth: `{db.format_peso(net_worth)}`"
             ),
             inline=True,
         )
@@ -210,28 +210,28 @@ class Profile(commands.Cog):
             job_range = "`Unemployed`"
 
         embed.add_field(
-            name="💼 Job",
+            name="Job",
             value=(
                 f"Current: `{job_info['label'] if job_info else 'None'}`\n"
-                f"{job_range}"
+                f"Range: {job_range}"
             ),
             inline=True,
         )
 
         # ---------------- Inventory ----------------
         embed.add_field(
-            name="🎒 Inventory",
+            name="Items",
             value=(
                 f"Unique: `{unique_items}`\n"
                 f"Total: `{total_items}`\n"
-                f"Value: `{db.format_peso(inventory_value)}`"
+                f"Worth: `{db.format_peso(inventory_value)}`"
             ),
             inline=True,
         )
 
         # ---------------- Cooldowns ----------------
         embed.add_field(
-            name="⚡ Cooldowns",
+            name="Cooldowns",
             value=(
                 f"Work: `{fmt_cooldown(user_id, WORK_COOLDOWN_FIELD, TRABAHO_COOLDOWN_SECONDS)}`\n"
                 f"Allowance: `{fmt_cooldown(user_id, ALLOWANCE_COOLDOWN_FIELD, ALLOWANCE_COOLDOWN_SECONDS)}`\n"
@@ -245,7 +245,7 @@ class Profile(commands.Cog):
 
         # ---------------- Activities ----------------
         embed.add_field(
-            name="🎮 Activities",
+            name="Activities",
             value=(
                 f"Karaoke: `{fmt_cooldown(user_id, KARAOKE_COOLDOWN_FIELD, KARAOKE_COOLDOWN_SECONDS)}`\n"
                 f"Sideline: `{fmt_cooldown(user_id, 'last_sideline', SIDELINE_COOLDOWN_SECONDS)}`\n"
@@ -268,15 +268,15 @@ class Profile(commands.Cog):
         ]
 
         if biz_broken > 0:
-            business_lines.append(f"⚠️ Needs Repair: `{biz_broken}`")
+            business_lines.append(f"Needs Repair: `{biz_broken}`")
 
         if protected_until > now:
             business_lines.append(
-                f"🛡️ Defended: `{db.format_duration(protected_until - now)}`"
+                f"Defended: `{db.format_duration(protected_until - now)}`"
             )
 
         embed.add_field(
-            name="🏪 Businesses",
+            name="Businesses",
             value="\n".join(business_lines),
             inline=True,
         )
@@ -288,22 +288,22 @@ class Profile(commands.Cog):
         ]
 
         if overdue_count > 0:
-            loan_lines.append(f"⚠️ Overdue: `{overdue_count}`")
+            loan_lines.append(f"Overdue: `{overdue_count}`")
 
         embed.add_field(
-            name="🏦 Loans",
+            name="Loans",
             value="\n".join(loan_lines),
             inline=True,
         )
 
         # ---------------- Information ----------------
         embed.add_field(
-            name="📋 Information",
-            value=f"User ID:\n`{member.id}`",
+            name="Information",
+            value=f"User ID: `{member.id}`",
             inline=True,
         )
 
-        embed.set_footer(text="Keep grinding 💸")
+        embed.set_footer(text="Keep grinding")
 
         await interaction.response.send_message(embed=embed)
 
