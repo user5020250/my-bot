@@ -1,264 +1,207 @@
-import discord
+import time
 
+import discord
 from discord import app_commands
 from discord.ext import commands
 
 import db_utils as db
+from database import get_conn
+from jobs_data import JOBS
 
-from jobs_data import (
-    JOBS,
-    TRABAHO_COOLDOWN_SECONDS,
-)
+WHITE = discord.Color(0xFFFFFF)
 
-WHITE = discord.Color(0x2B2D31)
 
-SIDELINE_COOLDOWN_SECONDS = 60
-BAON_COOLDOWN_SECONDS = 24 * 60 * 60
-KARAOKE_COOLDOWN_SECONDS = 60
+def get_protected_until(user_id: str) -> int:
+    conn = get_conn()
 
-FISH_COOLDOWN_SECONDS = 60
-MINE_COOLDOWN_SECONDS = 60
-FARM_COOLDOWN_SECONDS = 60
-HUNT_COOLDOWN_SECONDS = 60
-COOK_COOLDOWN_SECONDS = 60
+    row = conn.execute(
+        """
+        SELECT protected_until
+        FROM business_status
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchone()
 
-# Mirrors the constants in rewards.py — kept local rather than imported
-# since /profile only needs the durations, not the reward logic.
-DAILY_COOLDOWN_SECONDS = 1 * 24 * 60 * 60
-WEEKLY_COOLDOWN_SECONDS = 7 * 24 * 60 * 60
-MONTHLY_COOLDOWN_SECONDS = 30 * 24 * 60 * 60
-YEARLY_COOLDOWN_SECONDS = 365 * 24 * 60 * 60
+    conn.close()
+
+    return row["protected_until"] if row else 0
+
+
+def get_business_summary(user_id: str):
+    conn = get_conn()
+
+    rows = conn.execute(
+        """
+        SELECT business_key, level, lifetime_earnings, broken
+        FROM owned_businesses
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchall()
+
+    conn.close()
+
+    count = len(rows)
+    broken_count = sum(1 for r in rows if r["broken"])
+    total_lifetime = sum(r["lifetime_earnings"] for r in rows)
+
+    return count, broken_count, total_lifetime
+
+
+def get_loan_summary(user_id: str):
+    conn = get_conn()
+
+    borrowed = conn.execute(
+        """
+        SELECT COALESCE(SUM(remaining), 0) AS total
+        FROM loans
+        WHERE borrower = ?
+        AND status = 'active'
+        """,
+        (user_id,),
+    ).fetchone()
+
+    lent = conn.execute(
+        """
+        SELECT COALESCE(SUM(remaining), 0) AS total
+        FROM loans
+        WHERE lender = ?
+        AND status = 'active'
+        """,
+        (user_id,),
+    ).fetchone()
+
+    conn.close()
+
+    return borrowed["total"], lent["total"]
+
+
+def get_inventory_item_count(user_id: str) -> int:
+    conn = get_conn()
+
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM inventory
+        WHERE user_id = ?
+        AND qty > 0
+        """,
+        (user_id,),
+    ).fetchone()
+
+    conn.close()
+
+    return row["count"] if row else 0
 
 
 class Profile(commands.Cog):
-    def __init__(
-        self,
-        bot: commands.Bot,
-    ):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @app_commands.command(
         name="profile",
-        description="View a profile.",
+        description="View a player's profile.",
     )
     @app_commands.describe(
-        user="Leave blank to view yourself.",
+        member="Whose profile to view (defaults to you)",
     )
     async def profile(
         self,
         interaction: discord.Interaction,
-        user: discord.Member = None,
+        member: discord.Member | None = None,
     ):
-        target = user or interaction.user
-        user_id = str(target.id)
+        member = member or interaction.user
+        user_id = str(member.id)
 
-        data = db.get_user(user_id)
-
-        job_key = data["job"]
-
-        job_label = (
-            JOBS[job_key]["label"]
-            if job_key in JOBS
-            else "Unemployed"
-        )
-
-        trabaho_cd = db.check_cooldown(
-            user_id,
-            "last_trabaho",
-            TRABAHO_COOLDOWN_SECONDS,
-        )
-
-        sideline_cd = db.check_cooldown(
-            user_id,
-            "last_sideline",
-            SIDELINE_COOLDOWN_SECONDS,
-        )
-
-        baon_cd = db.check_cooldown(
-            user_id,
-            "last_baon",
-            BAON_COOLDOWN_SECONDS,
-        )
-
-        karaoke_cd = db.check_cooldown(
-            user_id,
-            "last_karaoke",
-            KARAOKE_COOLDOWN_SECONDS,
-        )
-
-        fish_cd = db.check_cooldown(
-            user_id,
-            "last_fish",
-            FISH_COOLDOWN_SECONDS,
-        )
-
-        mine_cd = db.check_cooldown(
-            user_id,
-            "last_mine",
-            MINE_COOLDOWN_SECONDS,
-        )
-
-        farm_cd = db.check_cooldown(
-            user_id,
-            "last_farm",
-            FARM_COOLDOWN_SECONDS,
-        )
-
-        hunt_cd = db.check_cooldown(
-            user_id,
-            "last_hunt",
-            HUNT_COOLDOWN_SECONDS,
-        )
-
-        cook_cd = db.check_cooldown(
-            user_id,
-            "last_cook",
-            COOK_COOLDOWN_SECONDS,
-        )
-
-        daily_cd = db.check_cooldown(
-            user_id,
-            "last_daily",
-            DAILY_COOLDOWN_SECONDS,
-        )
-
-        weekly_cd = db.check_cooldown(
-            user_id,
-            "last_weekly",
-            WEEKLY_COOLDOWN_SECONDS,
-        )
-
-        monthly_cd = db.check_cooldown(
-            user_id,
-            "last_monthly",
-            MONTHLY_COOLDOWN_SECONDS,
-        )
-
-        yearly_cd = db.check_cooldown(
-            user_id,
-            "last_yearly",
-            YEARLY_COOLDOWN_SECONDS,
-        )
-
-        inventory = db.get_all_inventory(
-            user_id
-        )
-
-        unique_items = len(
-            inventory
-        )
-
-        total_items = sum(
-            item["qty"]
-            for item in inventory
-        )
-
-        inventory_value = sum(
-            item["qty"] * item["avg_buy_price"]
-            for item in inventory
-        )
+        user = db.get_user(user_id)
 
         embed = discord.Embed(
+            title=f"👤 {member.display_name}'s Profile",
             color=WHITE,
         )
 
-        embed.set_author(
-            name=f"{target.display_name}'s Profile",
-            icon_url=target.display_avatar.url,
-        )
-
         embed.set_thumbnail(
-            url=target.display_avatar.url,
+            url=member.display_avatar.url
         )
 
         embed.add_field(
-            name="💰 Money",
-            value=(
-                f"Wallet: `{db.format_peso(data['balance'])}`\n"
-                f"Net Worth: `{db.format_peso(data['balance'] + inventory_value)}`"
-            ),
+            name="💰 Balance",
+            value=f"`{db.format_peso(user['balance'])}`",
             inline=True,
         )
 
+        current_job = user["job"]
+
+        if current_job and current_job in JOBS:
+            job_label = JOBS[current_job]["label"]
+        else:
+            job_label = "Unemployed"
+
         embed.add_field(
-            name="💼 Job",
-            value=(
-                f"Current: `{job_label}`"
-            ),
+            name="👔 Job",
+            value=f"`{job_label}`",
             inline=True,
         )
+
+        now = int(time.time())
+        protected_until = get_protected_until(user_id)
+
+        if protected_until > now:
+            embed.add_field(
+                name="🔒 Padlock",
+                value=f"`{db.format_duration(protected_until - now)}` remaining",
+                inline=True,
+            )
+
+        business_count, broken_count, business_lifetime = get_business_summary(user_id)
+
+        business_value = f"`{business_count}` owned"
+
+        if broken_count > 0:
+            business_value += f" (`{broken_count}` need repair)"
+
+        embed.add_field(
+            name="💼 Businesses",
+            value=business_value,
+            inline=True,
+        )
+
+        if business_count > 0:
+            embed.add_field(
+                name="📈 Business Lifetime Earnings",
+                value=f"`{db.format_peso(business_lifetime)}`",
+                inline=True,
+            )
+
+        borrowed_total, lent_total = get_loan_summary(user_id)
+
+        if borrowed_total > 0:
+            embed.add_field(
+                name="📤 Owed by You",
+                value=f"`{db.format_peso(borrowed_total)}`",
+                inline=True,
+            )
+
+        if lent_total > 0:
+            embed.add_field(
+                name="📥 Owed to You",
+                value=f"`{db.format_peso(lent_total)}`",
+                inline=True,
+            )
+
+        item_count = get_inventory_item_count(user_id)
 
         embed.add_field(
             name="🎒 Inventory",
-            value=(
-                f"Unique: `{unique_items}`\n"
-                f"Total: `{total_items}`\n"
-                f"Value: `{db.format_peso(inventory_value)}`"
-            ),
+            value=f"`{item_count}` item type(s)",
             inline=True,
         )
 
-        embed.add_field(
-            name="⚡ Cooldowns",
-            value=(
-                f"Work: "
-                f"`{'Ready' if trabaho_cd == 0 else db.format_duration(trabaho_cd)}`\n"
-                f"Allowance: "
-                f"`{'Ready' if baon_cd == 0 else db.format_duration(baon_cd)}`\n"
-                f"Daily: "
-                f"`{'Ready' if daily_cd == 0 else db.format_duration(daily_cd)}`\n"
-                f"Weekly: "
-                f"`{'Ready' if weekly_cd == 0 else db.format_duration(weekly_cd)}`\n"
-                f"Monthly: "
-                f"`{'Ready' if monthly_cd == 0 else db.format_duration(monthly_cd)}`\n"
-                f"Yearly: "
-                f"`{'Ready' if yearly_cd == 0 else db.format_duration(yearly_cd)}`"
-            ),
-            inline=True,
-        )
-
-        embed.add_field(
-            name="🎮 Activities",
-            value=(
-                f"Karaoke: "
-                f"`{'Ready' if karaoke_cd == 0 else db.format_duration(karaoke_cd)}`\n"
-                f"Sideline: "
-                f"`{'Ready' if sideline_cd == 0 else db.format_duration(sideline_cd)}`\n"
-                f"Fish: "
-                f"`{'Ready' if fish_cd == 0 else db.format_duration(fish_cd)}`\n"
-                f"Mine: "
-                f"`{'Ready' if mine_cd == 0 else db.format_duration(mine_cd)}`\n"
-                f"Farm: "
-                f"`{'Ready' if farm_cd == 0 else db.format_duration(farm_cd)}`\n"
-                f"Hunt: "
-                f"`{'Ready' if hunt_cd == 0 else db.format_duration(hunt_cd)}`\n"
-                f"Cook: "
-                f"`{'Ready' if cook_cd == 0 else db.format_duration(cook_cd)}`"
-            ),
-            inline=True,
-        )
-
-        embed.add_field(
-            name="📋 Information",
-            value=(
-                f"User ID:\n"
-                f"`{target.id}`"
-            ),
-            inline=True,
-        )
-
-        embed.set_footer(
-            text="Keep grinding 💸"
-        )
-
-        await interaction.response.send_message(
-            embed=embed
-        )
+        await interaction.response.send_message(embed=embed)
 
 
-async def setup(
-    bot: commands.Bot,
-):
+async def setup(bot: commands.Bot):
     await bot.add_cog(
         Profile(bot)
     )
