@@ -1,961 +1,134 @@
-"""
-db_utils.py
+import os
+import sqlite3
 
-Common helper functions for the economy database.
-"""
+DATA_DIR = os.getenv(
+    "DATA_DIR",
+    "data",
+)
 
-import time
+os.makedirs(
+    DATA_DIR,
+    exist_ok=True,
+)
 
-from database import get_conn
-
-STARTING_MONEY = 1000
-
-_ALLOWED_COOLDOWN_FIELDS = {
-    "last_trabaho",
-    "last_tambay",
-    "last_budol",
-    "last_baon",
-    "last_karaoke",
-    "last_daily",
-    "last_weekly",
-    "last_monthly",
-    "last_yearly",
-    "last_sideline",
-    "last_fish",
-    "last_mine",
-    "last_farm",
-    "last_hunt",
-    "last_cook",
-}
-
-# ==========================================================
-# ADMIN
-# ==========================================================
-
-def reset_all_cooldowns() -> None:
-
-    conn = get_conn()
-
-    try:
-        fields = ", ".join(
-            f"{field} = 0"
-            for field in _ALLOWED_COOLDOWN_FIELDS
-        )
-
-        conn.execute(
-            f"""
-            UPDATE users
-            SET {fields}
-            """
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
+DB_PATH = os.path.join(
+    DATA_DIR,
+    "economy.db",
+)
 
 
-def reset_user_cooldowns(
-    user_id: str,
-) -> None:
+def get_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
 
-    get_user(user_id)
+    conn.row_factory = sqlite3.Row
 
-    conn = get_conn()
-
-    try:
-        fields = ", ".join(
-            f"{field} = 0"
-            for field in _ALLOWED_COOLDOWN_FIELDS
-        )
-
-        conn.execute(
-            f"""
-            UPDATE users
-            SET {fields}
-            WHERE id = ?
-            """,
-            (user_id,),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-# ==========================================================
-# LOTTERY
-# ==========================================================
-
-def create_lottery(
-    prize: int,
-    ends_at: int,
-) -> None:
-
-    conn = get_conn()
-
-    try:
-        conn.execute("DELETE FROM lottery")
-        conn.execute("DELETE FROM lottery_entries")
-
-        conn.execute(
-            """
-            INSERT INTO lottery (
-                id,
-                prize,
-                ends_at,
-                active
-            )
-            VALUES (
-                1,
-                ?,
-                ?,
-                1
-            )
-            """,
-            (
-                prize,
-                ends_at,
-            ),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
+    return conn
 
 
-def get_lottery() -> dict | None:
-
-    conn = get_conn()
-
-    try:
-        row = conn.execute(
-            """
-            SELECT *
-            FROM lottery
-            WHERE active = 1
-            LIMIT 1
-            """
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if row is None:
-        return None
-
-    return dict(row)
-
-
-def end_lottery() -> None:
-
-    conn = get_conn()
-
-    try:
-        conn.execute(
-            """
-            UPDATE lottery
-            SET active = 0
-            WHERE id = 1
-            """
-        )
-
-        conn.execute("DELETE FROM lottery_entries")
-
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def clear_lottery_entries() -> None:
-
-    conn = get_conn()
-
-    try:
-        conn.execute("DELETE FROM lottery_entries")
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def join_lottery(
-    user_id: str,
-    tickets: int = 1,
-) -> bool:
-
-    lottery = get_lottery()
-
-    if lottery is None:
-        return False
-
-    if tickets <= 0:
-        return False
-
-    if not has_item(
-        user_id,
-        "lottery_ticket",
-        tickets,
-    ):
-        return False
-
-    conn = get_conn()
-
-    try:
-        row = conn.execute(
-            """
-            SELECT tickets
-            FROM lottery_entries
-            WHERE user_id = ?
-            """,
-            (
-                user_id,
-            ),
-        ).fetchone()
-
-        current_tickets = 0
-
-        if row:
-            current_tickets = row["tickets"]
-
-        new_total = current_tickets + tickets
-
-        conn.execute(
-            """
-            INSERT INTO lottery_entries (
-                user_id,
-                tickets
-            )
-            VALUES (?, ?)
-
-            ON CONFLICT(user_id)
-
-            DO UPDATE SET
-                tickets = excluded.tickets
-            """,
-            (
-                user_id,
-                new_total,
-            ),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-    remove_inventory(
-        user_id,
-        "lottery_ticket",
-        tickets,
-    )
-
-    return True
-
-
-def get_lottery_entries() -> list[dict]:
-
-    conn = get_conn()
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT *
-            FROM lottery_entries
-            """
+def add_column_if_missing(
+    conn: sqlite3.Connection,
+    table: str,
+    column: str,
+    definition: str,
+):
+    columns = {
+        row["name"]
+        for row in conn.execute(
+            f"PRAGMA table_info({table})"
         ).fetchall()
-    finally:
-        conn.close()
-
-    return [
-        dict(row)
-        for row in rows
-    ]
-
-
-def set_lottery_channel(
-    guild_id: str,
-    channel_id: str,
-) -> None:
-
-    conn = get_conn()
-
-    try:
-        conn.execute(
-            """
-            INSERT INTO lottery_channels (
-                guild_id,
-                channel_id
-            )
-            VALUES (?, ?)
-
-            ON CONFLICT(guild_id)
-
-            DO UPDATE SET
-                channel_id = excluded.channel_id
-            """,
-            (
-                guild_id,
-                channel_id,
-            ),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def get_lottery_channel(
-    guild_id: str,
-) -> str | None:
-
-    conn = get_conn()
-
-    try:
-        row = conn.execute(
-            """
-            SELECT channel_id
-            FROM lottery_channels
-            WHERE guild_id = ?
-            """,
-            (
-                guild_id,
-            ),
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if row is None:
-        return None
-
-    return row["channel_id"]
-
-
-def get_all_lottery_channels() -> list[dict]:
-
-    conn = get_conn()
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT *
-            FROM lottery_channels
-            """
-        ).fetchall()
-    finally:
-        conn.close()
-
-    return [
-        dict(row)
-        for row in rows
-    ]
-
-# ==========================================================
-# USERS
-# ==========================================================
-
-def get_user(
-    user_id: str,
-) -> dict:
-
-    conn = get_conn()
-
-    try:
-        row = conn.execute(
-            """
-            SELECT *
-            FROM users
-            WHERE id = ?
-            """,
-            (
-                user_id,
-            ),
-        ).fetchone()
-
-        if row is None:
-            conn.execute(
-                """
-                INSERT INTO users (
-                    id,
-                    balance
-                )
-                VALUES (?, ?)
-                """,
-                (
-                    user_id,
-                    STARTING_MONEY,
-                ),
-            )
-
-            conn.commit()
-
-            row = conn.execute(
-                """
-                SELECT *
-                FROM users
-                WHERE id = ?
-                """,
-                (
-                    user_id,
-                ),
-            ).fetchone()
-    finally:
-        conn.close()
-
-    return dict(row)
-
-
-def set_balance(
-    user_id: str,
-    amount: int,
-) -> int:
-
-    get_user(user_id)
-
-    amount = max(
-        0,
-        round(amount),
-    )
-
-    conn = get_conn()
-
-    try:
-        conn.execute(
-            """
-            UPDATE users
-            SET balance = ?
-            WHERE id = ?
-            """,
-            (
-                amount,
-                user_id,
-            ),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-    return amount
-
-
-def add_balance(
-    user_id: str,
-    delta: int,
-) -> int:
-
-    user = get_user(
-        user_id,
-    )
-
-    return set_balance(
-        user_id,
-        user["balance"] + delta,
-    )
-
-
-def set_job(
-    user_id: str,
-    job: str,
-) -> None:
-
-    get_user(user_id)
-
-    conn = get_conn()
-
-    try:
-        conn.execute(
-            """
-            UPDATE users
-            SET job = ?
-            WHERE id = ?
-            """,
-            (
-                job,
-                user_id,
-            ),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-
-# ==========================================================
-# STATUS EFFECTS (business_status table)
-# ==========================================================
-
-_ALLOWED_STATUS_FIELDS = {
-    "protected_until",
-    "gloves_until",
-    "mask_until",
-}
-
-
-def ensure_status_effect_columns() -> None:
-
-    conn = get_conn()
-
-    try:
-        existing_cols = {
-            row["name"] for row in conn.execute("PRAGMA table_info(business_status)")
-        }
-
-        additions = {
-            "protected_until": "INTEGER NOT NULL DEFAULT 0",
-            "gloves_until": "INTEGER NOT NULL DEFAULT 0",
-            "mask_until": "INTEGER NOT NULL DEFAULT 0",
-        }
-
-        for col, decl in additions.items():
-            if col not in existing_cols:
-                conn.execute(
-                    f"ALTER TABLE business_status ADD COLUMN {col} {decl}"
-                )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def get_business_status(
-    user_id: str,
-) -> dict:
-
-    conn = get_conn()
-
-    try:
-        row = conn.execute(
-            """
-            SELECT *
-            FROM business_status
-            WHERE user_id = ?
-            """,
-            (user_id,),
-        ).fetchone()
-
-        if row is None:
-            conn.execute(
-                """
-                INSERT INTO business_status (user_id)
-                VALUES (?)
-                """,
-                (user_id,),
-            )
-
-            conn.commit()
-
-            row = conn.execute(
-                """
-                SELECT *
-                FROM business_status
-                WHERE user_id = ?
-                """,
-                (user_id,),
-            ).fetchone()
-    finally:
-        conn.close()
-
-    return dict(row)
-
-
-def set_status_field(
-    user_id: str,
-    field: str,
-    value: int,
-) -> None:
-
-    if field not in _ALLOWED_STATUS_FIELDS:
-        raise ValueError(
-            f"Unknown status field: {field}"
-        )
-
-    get_business_status(user_id)
-
-    conn = get_conn()
-
-    try:
-        conn.execute(
-            f"""
-            UPDATE business_status
-            SET {field} = ?
-            WHERE user_id = ?
-            """,
-            (
-                value,
-                user_id,
-            ),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-
-# ==========================================================
-# COOLDOWNS
-# ==========================================================
-
-def set_cooldown(
-    user_id: str,
-    field: str,
-    timestamp: int,
-) -> None:
-
-    if field not in _ALLOWED_COOLDOWN_FIELDS:
-        raise ValueError(
-            f"Unknown cooldown field: {field}"
-        )
-
-    get_user(user_id)
-
-    conn = get_conn()
-
-    try:
-        conn.execute(
-            f"""
-            UPDATE users
-            SET {field} = ?
-            WHERE id = ?
-            """,
-            (
-                timestamp,
-                user_id,
-            ),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def check_cooldown(
-    user_id: str,
-    field: str,
-    cooldown_seconds: int,
-) -> int:
-
-    if field not in _ALLOWED_COOLDOWN_FIELDS:
-        raise ValueError(
-            f"Unknown cooldown field: {field}"
-        )
-
-    user = get_user(
-        user_id,
-    )
-
-    last_used = user.get(
-        field,
-        0,
-    ) or 0
-
-    now = int(
-        time.time(),
-    )
-
-    remaining = cooldown_seconds - (
-        now - last_used
-    )
-
-    return max(
-        0,
-        remaining,
-    )
-
-
-# ==========================================================
-# INVENTORY
-# ==========================================================
-
-def get_inventory(
-    user_id: str,
-    item: str,
-) -> dict:
-
-    conn = get_conn()
-
-    try:
-        row = conn.execute(
-            """
-            SELECT *
-            FROM inventory
-            WHERE user_id = ?
-            AND item = ?
-            """,
-            (
-                user_id,
-                item,
-            ),
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if row is None:
-        return {
-            "user_id": user_id,
-            "item": item,
-            "qty": 0,
-            "avg_buy_price": 0,
-        }
-
-    return dict(row)
-
-
-def get_inventory_qty(
-    user_id: str,
-    item: str,
-) -> int:
-
-    inventory = get_inventory(
-        user_id,
-        item,
-    )
-
-    return inventory["qty"]
-
-
-def get_all_inventory(
-    user_id: str,
-) -> list[dict]:
-
-    conn = get_conn()
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT *
-            FROM inventory
-            WHERE user_id = ?
-            AND qty > 0
-            ORDER BY qty DESC, item ASC
-            """,
-            (
-                user_id,
-            ),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    return [
-        dict(row)
-        for row in rows
-    ]
-
-
-def has_item(
-    user_id: str,
-    item: str,
-    amount: int = 1,
-) -> bool:
-
-    return (
-        get_inventory_qty(
-            user_id,
-            item,
-        )
-        >= amount
-    )
-
-
-def add_inventory(
-    user_id: str,
-    item: str,
-    delta: int,
-    buy_price: int | None = None,
-) -> int:
-
-    inventory = get_inventory(
-        user_id,
-        item,
-    )
-
-    current_qty = inventory[
-        "qty"
-    ]
-
-    current_avg = inventory[
-        "avg_buy_price"
-    ]
-
-    new_qty = max(
-        0,
-        current_qty + delta,
-    )
-
-    new_avg = current_avg
-
-    if (
-        delta > 0
-        and buy_price is not None
-        and new_qty > 0
-    ):
-        total_cost = (
-            current_qty * current_avg
-            + delta * buy_price
-        )
-
-        new_avg = round(
-            total_cost / new_qty
-        )
-
-    if new_qty == 0:
-        new_avg = 0
-
-    conn = get_conn()
-
-    try:
-        conn.execute(
-            """
-            INSERT INTO inventory (
-                user_id,
-                item,
-                qty,
-                avg_buy_price
-            )
-            VALUES (?, ?, ?, ?)
-
-            ON CONFLICT (
-                user_id,
-                item
-            )
-
-            DO UPDATE SET
-                qty = excluded.qty,
-                avg_buy_price = excluded.avg_buy_price
-            """,
-            (
-                user_id,
-                item,
-                new_qty,
-                new_avg,
-            ),
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
-    return new_qty
-
-
-def remove_inventory(
-    user_id: str,
-    item: str,
-    amount: int = 1,
-) -> bool:
-
-    current_qty = get_inventory_qty(
-        user_id,
-        item,
-    )
-
-    if current_qty < amount:
-        return False
-
-    add_inventory(
-        user_id,
-        item,
-        -amount,
-    )
-
-    return True
-
-# ==========================================================
-# MONEY PARSER
-# ==========================================================
-
-def parse_money(
-    text: str,
-) -> int:
-
-    text = text.lower().strip()
-
-    multipliers = {
-        "k": 1_000,
-        "m": 1_000_000,
-        "b": 1_000_000_000,
-        "t": 1_000_000_000_000,
     }
 
-    try:
-        suffix = text[-1]
-
-        if suffix in multipliers:
-
-            number = float(
-                text[:-1]
-            )
-
-            return int(
-                number * multipliers[suffix]
-            )
-
-        return int(text)
-
-    except (
-        ValueError,
-        IndexError,
-    ):
-        raise ValueError(
-            "Invalid amount."
+    if column not in columns:
+        conn.execute(
+            f"""
+            ALTER TABLE {table}
+            ADD COLUMN {column} {definition}
+            """
         )
 
-# ==========================================================
-# FORMATTING
-# ==========================================================
 
-def format_peso(
-    amount: int,
-) -> str:
+def init_db() -> None:
+    conn = get_conn()
 
-    return f"₱{amount:,.0f}"
+    # NOTE: the following tables were removed along with their cogs and
+    # are no longer created here:
+    #   - inventory          (was inventory.py)
+    #   - shop_stock         (was shop.py)
+    #   - debts              (was loan.py)
+    #   - loans              (was loan.py)
+    #   - owned_businesses   (was business.py)
+    #   - business_status    (was business.py)
+    #   - lottery            (was lottery.py)
+    #   - lottery_entries    (was lottery.py)
+    #   - lottery_channels   (was lottery.py)
+    # If any leftover tables exist in an old economy.db file, they are
+    # simply ignored (not dropped) — see the DROP TABLE section below if
+    # you want this script to clean them up automatically instead.
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            balance INTEGER NOT NULL DEFAULT 1000,
+            job TEXT DEFAULT NULL,
 
+            last_trabaho INTEGER NOT NULL DEFAULT 0,
+            last_tambay INTEGER NOT NULL DEFAULT 0,
+            last_sideline INTEGER NOT NULL DEFAULT 0,
+            last_budol INTEGER NOT NULL DEFAULT 0,
+            last_baon INTEGER NOT NULL DEFAULT 0,
+            last_karaoke INTEGER NOT NULL DEFAULT 0,
 
-def format_duration(
-    seconds: int,
-) -> str:
+            last_daily INTEGER NOT NULL DEFAULT 0,
+            last_weekly INTEGER NOT NULL DEFAULT 0,
+            last_monthly INTEGER NOT NULL DEFAULT 0,
+            last_yearly INTEGER NOT NULL DEFAULT 0,
 
-    seconds = int(
-        seconds,
+            last_fish INTEGER NOT NULL DEFAULT 0,
+            last_mine INTEGER NOT NULL DEFAULT 0,
+            last_farm INTEGER NOT NULL DEFAULT 0,
+            last_hunt INTEGER NOT NULL DEFAULT 0,
+            last_cook INTEGER NOT NULL DEFAULT 0
+        );
+        """
     )
 
-    days, seconds = divmod(
-        seconds,
-        86400,
-    )
+    user_migrations = {
+        "last_sideline": "INTEGER NOT NULL DEFAULT 0",
+        "last_daily": "INTEGER NOT NULL DEFAULT 0",
+        "last_weekly": "INTEGER NOT NULL DEFAULT 0",
+        "last_monthly": "INTEGER NOT NULL DEFAULT 0",
+        "last_yearly": "INTEGER NOT NULL DEFAULT 0",
+        "last_fish": "INTEGER NOT NULL DEFAULT 0",
+        "last_mine": "INTEGER NOT NULL DEFAULT 0",
+        "last_farm": "INTEGER NOT NULL DEFAULT 0",
+        "last_hunt": "INTEGER NOT NULL DEFAULT 0",
+        "last_cook": "INTEGER NOT NULL DEFAULT 0",
+    }
 
-    hours, seconds = divmod(
-        seconds,
-        3600,
-    )
-
-    minutes, seconds = divmod(
-        seconds,
-        60,
-    )
-
-    parts = []
-
-    if days:
-        parts.append(
-            f"{days}d"
+    for column, definition in user_migrations.items():
+        add_column_if_missing(
+            conn,
+            "users",
+            column,
+            definition,
         )
 
-    if hours:
-        parts.append(
-            f"{hours}h"
-        )
-
-    if minutes:
-        parts.append(
-            f"{minutes}m"
-        )
-
-    if (
-        seconds
-        and days == 0
-        and hours == 0
-    ):
-        parts.append(
-            f"{seconds}s"
-        )
-
-    return (
-        " ".join(parts)
-        or "0s"
+    # Drops tables from old/removed features so they don't linger in
+    # existing economy.db files. Safe to run repeatedly (IF EXISTS).
+    conn.executescript(
+        """
+        DROP TABLE IF EXISTS lotteries;
+        DROP TABLE IF EXISTS lottery;
+        DROP TABLE IF EXISTS lottery_entries;
+        DROP TABLE IF EXISTS lottery_channels;
+        DROP TABLE IF EXISTS inventory;
+        DROP TABLE IF EXISTS shop_stock;
+        DROP TABLE IF EXISTS debts;
+        DROP TABLE IF EXISTS loans;
+        DROP TABLE IF EXISTS owned_businesses;
+        DROP TABLE IF EXISTS business_status;
+        """
     )
+
+    conn.commit()
+    conn.close()
